@@ -193,6 +193,17 @@ body {
     transform: translateY(-2px);
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.leave-game-btn:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    border-color: var(--error) !important;
+}
+
 /* ===== Word Display ===== */
 .word-display {
     background: var(--bg-secondary);

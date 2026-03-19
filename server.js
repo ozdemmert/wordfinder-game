@@ -304,8 +304,13 @@ io.on('connection', (socket) => {
         socket.emit('lobbiesList', { lobbies: list });
     });
 
-    // ---------- LEAVE LOBBY ----------
+    // ---------- LEAVE LOBBY / GAME ----------
     socket.on('leaveLobby', () => {
+        if (!session || !session.lobbyCode) return;
+        removePFromLobby(session, socket);
+    });
+
+    socket.on('leaveGame', () => {
         if (!session || !session.lobbyCode) return;
         removePFromLobby(session, socket);
     });
@@ -418,6 +423,9 @@ io.on('connection', (socket) => {
         const player = lobby.players[session.playerId];
         if (player.gems < 1) { socket.emit('error', { message: 'Not enough gems!' }); return; }
 
+        // Deep-copy board so we can restore it if nothing is found
+        const originalBoard = JSON.parse(JSON.stringify(lobby.board));
+
         let foundWord = null, shuffles = 0;
         while (!foundWord && shuffles <= 5) {
             const candidates = findAllCandidates(lobby.board);
@@ -434,6 +442,8 @@ io.on('connection', (socket) => {
             io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
             socket.emit('hintResult', { word: foundWord, found: true });
         } else {
+            // Restore original board — no mutation should persist if hint failed
+            lobby.board = originalBoard;
             socket.emit('hintResult', { word: null, found: false });
         }
     });
@@ -468,40 +478,75 @@ io.on('connection', (socket) => {
     });
 });
 
-// ===== Remove player from lobby =====
+// ===== Remove player from lobby (handles mid-game) =====
+function removePlayerFromGame(lobby, playerId) {
+    const wasPlaying = lobby.status === 'playing';
+    const leavingIdx = lobby.playerOrder.indexOf(playerId);
+
+    delete lobby.players[playerId];
+    lobby.playerOrder = lobby.playerOrder.filter(id => id !== playerId);
+
+    if (lobby.playerOrder.length === 0) { return 'delete'; }
+
+    // Transfer host
+    if (lobby.host === playerId) {
+        lobby.host = lobby.playerOrder[0];
+        lobby.hostName = lobby.players[lobby.playerOrder[0]]?.name || '?';
+    }
+
+    if (wasPlaying && lobby.playerOrder.length > 0) {
+        // Recalculate total turns based on remaining players
+        const turnsPlayed = lobby.currentTurn;
+        const remainingRounds = Math.max(1, lobby.settings.turnsPerPlayer - Math.floor(turnsPlayed / (lobby.playerOrder.length + 1)));
+        lobby.totalTurns = turnsPlayed + (remainingRounds * lobby.playerOrder.length);
+
+        // Adjust current player index
+        if (leavingIdx >= 0) {
+            if (leavingIdx < lobby.currentPlayerIndex) {
+                lobby.currentPlayerIndex--;
+            } else if (leavingIdx === lobby.currentPlayerIndex) {
+                // It was the leaving player's turn — don't increment, just wrap
+            }
+            // Wrap if needed
+            if (lobby.currentPlayerIndex >= lobby.playerOrder.length) {
+                lobby.currentPlayerIndex = 0;
+            }
+        }
+
+        // End game if only 1 player left
+        if (lobby.playerOrder.length <= 1) {
+            lobby.status = 'finished';
+        }
+    }
+
+    return 'updated';
+}
+
 function removePFromLobby(sess, socket) {
     const code = sess.lobbyCode;
     const lobby = lobbies[code];
     if (!lobby) { sess.lobbyCode = null; return; }
 
+    const playerName = sess.playerName;
     socket.leave(code);
-    delete lobby.players[sess.playerId];
-    lobby.playerOrder = lobby.playerOrder.filter(id => id !== sess.playerId);
+    const result = removePlayerFromGame(lobby, sess.playerId);
     sess.lobbyCode = null;
 
-    if (lobby.playerOrder.length === 0) {
+    if (result === 'delete') {
         delete lobbies[code];
     } else {
-        if (lobby.host === sess.playerId) {
-            lobby.host = lobby.playerOrder[0];
-            lobby.hostName = lobby.players[lobby.playerOrder[0]]?.name || '?';
-        }
         io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+        io.to(code).emit('toast', { message: `${playerName} left the game`, type: 'error' });
     }
 }
 
 function removePFromLobbyByPid(playerId, code) {
     const lobby = lobbies[code];
     if (!lobby) return;
-    delete lobby.players[playerId];
-    lobby.playerOrder = lobby.playerOrder.filter(id => id !== playerId);
-    if (lobby.playerOrder.length === 0) {
+    const result = removePlayerFromGame(lobby, playerId);
+    if (result === 'delete') {
         delete lobbies[code];
     } else {
-        if (lobby.host === playerId) {
-            lobby.host = lobby.playerOrder[0];
-            lobby.hostName = lobby.players[lobby.playerOrder[0]]?.name || '?';
-        }
         io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
     }
 }

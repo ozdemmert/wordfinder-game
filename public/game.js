@@ -9,7 +9,7 @@ const LETTERS = {
 class SpellcastGame {
     constructor() {
         this.socket = io();
-        this.token = sessionStorage.getItem('wf_token');
+        this.token = localStorage.getItem('wf_token');
         this.myPlayerId = null;
         this.myName = '';
         this.currentLobbyCode = null;
@@ -41,7 +41,7 @@ class SpellcastGame {
         this.createEls = { backBtn: document.getElementById('back-from-create'), confirmBtn: document.getElementById('confirm-create-btn'), maxPlayersValue: document.getElementById('max-players-value'), maxPlayersDown: document.getElementById('max-players-down'), maxPlayersUp: document.getElementById('max-players-up'), roundsValue: document.getElementById('rounds-value'), roundsDown: document.getElementById('rounds-down'), roundsUp: document.getElementById('rounds-up'), gemsValue: document.getElementById('gems-value'), gemsDown: document.getElementById('gems-down'), gemsUp: document.getElementById('gems-up') };
         this.joinEls = { backBtn: document.getElementById('back-from-join'), codeInput: document.getElementById('room-code-input'), joinCodeBtn: document.getElementById('join-code-btn'), lobbyList: document.getElementById('lobby-list') };
         this.roomEls = { backBtn: document.getElementById('back-from-room'), codeDisplay: document.getElementById('room-code-display'), copyBtn: document.getElementById('copy-code-btn'), settingsInfo: document.getElementById('room-settings-info'), playerList: document.getElementById('room-players'), playerCount: document.getElementById('room-player-count'), startBtn: document.getElementById('room-start-btn') };
-        this.elements = { board: document.getElementById('game-board'), currentWord: document.getElementById('current-word'), wordScore: document.getElementById('word-score'), wordValidation: document.getElementById('word-validation'), scoreboard: document.getElementById('scoreboard'), turnIndicator: document.getElementById('turn-indicator'), submitBtn: document.getElementById('submit-btn'), clearBtn: document.getElementById('clear-btn'), shuffleBtn: document.getElementById('shuffle-btn'), swapBtn: document.getElementById('swap-btn'), hintBtn: document.getElementById('hint-btn'), modal: document.getElementById('game-over-modal'), rankingTable: document.getElementById('ranking-table'), playAgainBtn: document.getElementById('play-again-btn'), swapIndicator: document.getElementById('swap-indicator'), cancelSwap: document.getElementById('cancel-swap'), muteBtn: document.getElementById('mute-btn'), toast: document.getElementById('toast') };
+        this.elements = { board: document.getElementById('game-board'), currentWord: document.getElementById('current-word'), wordScore: document.getElementById('word-score'), wordValidation: document.getElementById('word-validation'), scoreboard: document.getElementById('scoreboard'), turnIndicator: document.getElementById('turn-indicator'), submitBtn: document.getElementById('submit-btn'), clearBtn: document.getElementById('clear-btn'), shuffleBtn: document.getElementById('shuffle-btn'), swapBtn: document.getElementById('swap-btn'), hintBtn: document.getElementById('hint-btn'), modal: document.getElementById('game-over-modal'), rankingTable: document.getElementById('ranking-table'), playAgainBtn: document.getElementById('play-again-btn'), swapIndicator: document.getElementById('swap-indicator'), cancelSwap: document.getElementById('cancel-swap'), muteBtn: document.getElementById('mute-btn'), leaveGameBtn: document.getElementById('leave-game-btn'), toast: document.getElementById('toast') };
 
         this.bindEvents();
         this.setupSocket();
@@ -57,7 +57,7 @@ class SpellcastGame {
 
         this.socket.on('authenticated', ({ token, reconnected, playerId, name }) => {
             this.token = token;
-            sessionStorage.setItem('wf_token', token);
+            localStorage.setItem('wf_token', token);
             if (playerId) this.myPlayerId = playerId;
             if (name) this.myName = name;
             if (reconnected && name) {
@@ -228,6 +228,7 @@ class SpellcastGame {
         this.elements.hintBtn.addEventListener('click', () => { window.soundManager.play('click'); this.elements.hintBtn.disabled = true; this.showToast('Searching...', 'info'); this.socket.emit('useHint'); });
         this.elements.playAgainBtn.addEventListener('click', () => { window.soundManager.play('click'); this.backToMenu(); });
         this.elements.cancelSwap.addEventListener('click', () => { window.soundManager.play('click'); this.cancelSwapMode(); });
+        this.elements.leaveGameBtn.addEventListener('click', () => { if (confirm('Are you sure you want to leave the game?')) { this.socket.emit('leaveGame'); this.currentLobbyCode = null; this.showScreen('mainMenu'); } });
         this.elements.muteBtn.addEventListener('click', () => { const m = window.soundManager.toggleMute(); this.elements.muteBtn.textContent = m ? '🔇' : '🔊'; });
         document.addEventListener('keydown', (e) => {
             if (this.screens.game.style.display === 'none') return;
