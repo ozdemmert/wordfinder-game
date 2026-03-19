@@ -180,8 +180,8 @@ function dfsCandidates(board, row, col, word, visited, results) {
     const key = `${row}-${col}`;
     if (visited.has(key) || row < 0 || row >= 5 || col < 0 || col >= 5) return;
     const nw = word + board[row][col].letter;
-    if (nw.length > 7 || results.size > 200) return;
-    if (nw.length >= 3) results.add(nw);
+    if (nw.length > 7 || results.size > 1000) return;
+    if (nw.length >= 2) results.add(nw);
     const nv = new Set(visited); nv.add(key);
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
         if (dr === 0 && dc === 0) continue;
@@ -429,8 +429,9 @@ io.on('connection', (socket) => {
         let foundWord = null, shuffles = 0;
         while (!foundWord && shuffles <= 5) {
             const candidates = findAllCandidates(lobby.board);
-            candidates.sort((a, b) => b.length - a.length);
-            const top = candidates.slice(0, 15);
+            // Sort SHORTEST first — short words (3-4 letters) are far more likely to be real
+            candidates.sort((a, b) => a.length - b.length);
+            const top = candidates.slice(0, 40);
             const validPromises = top.map(async w => ({ word: w, valid: await isValidWord(w) }));
             const results = await Promise.allSettled(validPromises);
             for (const r of results) if (r.status === 'fulfilled' && r.value.valid) { foundWord = r.value.word; break; }
