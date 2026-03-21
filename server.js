@@ -169,24 +169,18 @@ function shuffleBoardLetters(board) {
     }
 }
 
-// ===== DFS Hint (Server-Side) =====
-function findAllCandidates(board) {
-    const results = new Set();
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) dfsCandidates(board, r, c, '', new Set(), results);
-    return [...results];
-}
-
-function dfsCandidates(board, row, col, word, visited, results) {
-    const key = `${row}-${col}`;
-    if (visited.has(key) || row < 0 || row >= 5 || col < 0 || col >= 5) return;
-    const nw = word + board[row][col].letter;
-    if (nw.length > 7 || results.size > 1000) return;
-    if (nw.length >= 2) results.add(nw);
-    const nv = new Set(visited); nv.add(key);
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue;
-        dfsCandidates(board, row + dr, col + dc, nw, nv, results);
+// ===== Hint: find all 2-letter adjacent pairs on the board =====
+function findTwoLetterPairs(board) {
+    const pairs = new Set();
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = r + dr, nc = c + dc;
+            if (nr < 0 || nr >= 5 || nc < 0 || nc >= 5) continue;
+            pairs.add(board[r][c].letter + board[nr][nc].letter);
+        }
     }
+    return [...pairs];
 }
 
 // ===== Build lobby payload for clients =====
@@ -414,7 +408,7 @@ io.on('connection', (socket) => {
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
     });
 
-    // ---------- HINT ----------
+    // ---------- HINT (2-letter words, shuffle until found) ----------
     socket.on('useHint', async () => {
         if (!session || !session.lobbyCode) return;
         const lobby = lobbies[session.lobbyCode];
@@ -423,19 +417,20 @@ io.on('connection', (socket) => {
         const player = lobby.players[session.playerId];
         if (player.gems < 1) { socket.emit('error', { message: 'Not enough gems!' }); return; }
 
-        // Deep-copy board so we can restore it if nothing is found
-        const originalBoard = JSON.parse(JSON.stringify(lobby.board));
+        let foundWord = null;
+        const MAX_ATTEMPTS = 20;
 
-        let foundWord = null, shuffles = 0;
-        while (!foundWord && shuffles <= 5) {
-            const candidates = findAllCandidates(lobby.board);
-            // Sort SHORTEST first — short words (3-4 letters) are far more likely to be real
-            candidates.sort((a, b) => a.length - b.length);
-            const top = candidates.slice(0, 40);
-            const validPromises = top.map(async w => ({ word: w, valid: await isValidWord(w) }));
-            const results = await Promise.allSettled(validPromises);
-            for (const r of results) if (r.status === 'fulfilled' && r.value.valid) { foundWord = r.value.word; break; }
-            if (!foundWord) { shuffles++; if (shuffles <= 5) shuffleBoardLetters(lobby.board); }
+        for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
+            const pairs = findTwoLetterPairs(lobby.board);
+            const results = await Promise.allSettled(
+                pairs.map(async w => ({ word: w, valid: await isValidWord(w) }))
+            );
+            for (const r of results) {
+                if (r.status === 'fulfilled' && r.value.valid) { foundWord = r.value.word; break; }
+            }
+            if (foundWord) break;
+            // Shuffle and try again
+            shuffleBoardLetters(lobby.board);
         }
 
         if (foundWord) {
@@ -443,8 +438,6 @@ io.on('connection', (socket) => {
             io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
             socket.emit('hintResult', { word: foundWord, found: true });
         } else {
-            // Restore original board — no mutation should persist if hint failed
-            lobby.board = originalBoard;
             socket.emit('hintResult', { word: null, found: false });
         }
     });

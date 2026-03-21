@@ -1,43 +1,75 @@
 # WordFinder — Multiplayer Word Game
 
-Discord'daki Spellcast oyunundan esinlenilmiş, tarayıcı tabanlı çok oyunculu kelime oyunu.
+A browser-based multiplayer word game inspired by Discord's Spellcast. Built with Node.js, Socket.IO, and vanilla JavaScript.
 
-## Nasıl Oynanır?
+## 🎮 How to Play
 
-1. **`index.html`** dosyasını tarayıcınızda açın.
-2. **Lobby** ekranında nickname girerek oyuncu ekleyin (1–6 kişi).
-3. **Start Game** ile oyunu başlatın.
-4. Sıranız geldiğinde bitişik harfleri birleştirerek kelimeler oluşturun.
-5. **Submit** ile kelimeyi gönderin — geçerliyse puan kazanırsınız, değilse seçiminiz kalır.
-6. Her oyuncu 5 tur oynar, oyun sonunda en yüksek skorlu oyuncu kazanır!
+1. Open the game URL in your browser.
+2. Enter a **nickname** on the main menu.
+3. **Create a lobby** (configure players, rounds, gems) or **join** an existing one via room code.
+4. Once everyone's in, the host starts the game.
+5. On your turn, connect adjacent letters to form words and hit **Submit**.
+6. Valid words earn points — collect gems from special tiles to use power-ups!
+7. The player with the highest score after all rounds wins! 🏆
 
-## Özellikler
+## ✨ Features
 
-- **1–6 Oyuncu** desteği (tek kişi de oynanabilir)
-- **Sıra tabanlı** oyun — her oyuncunun kendi gem havuzu
-- **5×5 Harf Tablosu** — kullanılan harfler yeni rastgele harflerle dolar
-- **Bonus Taşlar** — 2x/3x Harf, 2x Kelime (her turda karışır)
-- **Gem & Power-up** sistemi (Shuffle, Swap, Hint)
-- **~10.000 kelimelik** İngilizce sözlük
-- **Ses efektleri** ve sessiz modu
-- **Sıralama tablosu** ile oyun sonu (🥇🥈🥉)
+- **1–6 Players** — real-time multiplayer via WebSocket (Socket.IO)
+- **Turn-based** gameplay with per-player gem pools
+- **5×5 Letter Board** — used letters are replaced with new random ones
+- **Bonus Tiles** — 2x/3x Letter, 2x Word (reshuffled each turn)
+- **Gem & Power-up System** — Shuffle, Swap, Hint
+- **Server-side word validation** via [Free Dictionary API](https://dictionaryapi.dev/)
+- **Reconnection support** — close your browser and come back within 5 minutes
+- **Mid-game leave** — leave anytime, host transfers automatically
+- **Sound effects** with mute toggle
+- **Ranking table** at game over (🥇🥈🥉)
 
-## Dosyalar
+## 📁 Project Structure
 
-| Dosya | Açıklama |
-|-------|----------|
-| `index.html` | Lobby, oyun ekranı ve game-over modal |
-| `styles.css` | Karanlık tema, lobby, scoreboard, bonus stilleri |
-| `game.js` | Oyun mantığı, lobby, sıra sistemi, power-up'lar |
-| `words.js` | İngilizce kelime veritabanı (~10k) |
-| `audio.js` | Ses efektleri (Web Audio API) |
+```
+wordfinder/
+├── server.js          # Node.js + Socket.IO server (game logic, word validation)
+├── package.json       # Dependencies (express, socket.io, cors)
+├── .gitignore
+└── public/            # Static frontend (served by Express)
+    ├── index.html     # Menu, lobby, game, and game-over screens
+    ├── styles.css     # Dark theme, responsive layout, animations
+    ├── game.js        # Socket.IO client, UI rendering, tile interaction
+    └── audio.js       # Sound effects (Web Audio API)
+```
 
-## Power-up'lar
+## ⚡ Power-ups
 
-| Power-up | Maliyet | Etki |
-|----------|---------|------|
-| 🔀 Shuffle | 💎 3 | Tahtadaki harfleri karıştırır |
-| 🔄 Swap | 💎 2 | İki taşın yerini değiştirir |
-| 💡 Hint | 💎 1 | Geçerli bir kelime önerir |
+| Power-up | Cost | Effect |
+|----------|------|--------|
+| 🔀 Shuffle | 💎 3 | Rearranges all letters on the board |
+| 🔄 Swap | 💎 2 | Swaps the position of two tiles |
+| 💡 Hint | 💎 1 | Suggests a valid word from the board |
 
-İyi eğlenceler! 🎮
+## 🚀 Deployment
+
+Hosted on [Render](https://render.com):
+
+1. Push to GitHub
+2. Connect repo on Render → **Web Service** → Node runtime
+3. Build: `npm install` / Start: `node server.js`
+4. Your game is live at `https://your-app.onrender.com`
+
+## 🛠️ Local Development
+
+```bash
+npm install
+node server.js
+```
+
+Open `http://localhost:3001` in your browser.
+
+## 📝 Tech Stack
+
+- **Backend:** Node.js, Express, Socket.IO
+- **Frontend:** Vanilla HTML/CSS/JS, Socket.IO Client
+- **Word Validation:** [Free Dictionary API](https://dictionaryapi.dev/)
+- **Hosting:** Render (Web Service)
+
+Have fun! 🎮
