@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="KelimeBul - Çok oyunculu kelime oyunu. Harfleri birleştir, kelime oluştur, puan kazan!">
-    <title>KelimeBul - Kelime Oyunu</title>
+    <meta name="description" content="WordFinder - Multiplayer word game. Connect letters to form words and earn points!">
+    <title>WordFinder - Word Game</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,27 +17,27 @@
         <div class="menu-container">
             <div class="menu-header">
                 <span class="menu-icon">✨</span>
-                <h1 class="menu-title">KelimeBul</h1>
-                <p class="menu-subtitle">Harfleri birleştir, kelime bul, arkadaşlarını yen!</p>
+                <h1 class="menu-title">WordFinder</h1>
+                <p class="menu-subtitle">Connect letters, form words, beat your friends!</p>
             </div>
             <div class="menu-section">
-                <label class="menu-label">Rumuzun</label>
+                <label class="menu-label">Your Nickname</label>
                 <input type="text" class="menu-input" id="nickname-input"
-                       placeholder="Rumuz gir..." maxlength="12" autocomplete="off">
+                       placeholder="Enter nickname..." maxlength="12" autocomplete="off">
             </div>
             <div class="menu-buttons">
                 <button class="menu-btn create-btn" id="create-lobby-btn">
                     <span class="menu-btn-icon">🏠</span>
                     <div class="menu-btn-text">
-                        <span class="menu-btn-title">Oda Oluştur</span>
-                        <span class="menu-btn-desc">Yeni bir oyun odası kur</span>
+                        <span class="menu-btn-title">Create Lobby</span>
+                        <span class="menu-btn-desc">Host a new game room</span>
                     </div>
                 </button>
                 <button class="menu-btn join-btn" id="join-lobby-btn">
                     <span class="menu-btn-icon">🚪</span>
                     <div class="menu-btn-text">
-                        <span class="menu-btn-title">Odaya Katıl</span>
-                        <span class="menu-btn-desc">Oda kodunu gir</span>
+                        <span class="menu-btn-title">Join Lobby</span>
+                        <span class="menu-btn-desc">Enter a room code</span>
                     </div>
                 </button>
             </div>
@@ -47,11 +47,11 @@
     <!-- ========== CREATE LOBBY ========== -->
     <div class="screen" id="create-lobby-screen" style="display:none;">
         <div class="menu-container">
-            <button class="back-btn" id="back-from-create">← Geri</button>
-            <h2 class="screen-title">⚙️ Oda Ayarları</h2>
+            <button class="back-btn" id="back-from-create">← Back</button>
+            <h2 class="screen-title">⚙️ Lobby Settings</h2>
             <div class="settings-form">
                 <div class="setting-row">
-                    <label class="setting-label">Maks. Oyuncu</label>
+                    <label class="setting-label">Max Players</label>
                     <div class="setting-control">
                         <button class="stepper-btn" id="max-players-down">−</button>
                         <span class="stepper-value" id="max-players-value">4</span>
@@ -59,7 +59,7 @@
                     </div>
                 </div>
                 <div class="setting-row">
-                    <label class="setting-label">Kişi Başına Tur</label>
+                    <label class="setting-label">Rounds Per Player</label>
                     <div class="setting-control">
                         <button class="stepper-btn" id="rounds-down">−</button>
                         <span class="stepper-value" id="rounds-value">5</span>
@@ -67,7 +67,7 @@
                     </div>
                 </div>
                 <div class="setting-row">
-                    <label class="setting-label">Başlangıç Taşları</label>
+                    <label class="setting-label">Starting Gems</label>
                     <div class="setting-control">
                         <button class="stepper-btn" id="gems-down">−</button>
                         <span class="stepper-value" id="gems-value">5</span>
@@ -75,28 +75,28 @@
                     </div>
                 </div>
             </div>
-            <button class="lobby-start-btn" id="confirm-create-btn"><span>🚀</span> Oda Oluştur</button>
+            <button class="lobby-start-btn" id="confirm-create-btn"><span>🚀</span> Create Lobby</button>
         </div>
     </div>
 
     <!-- ========== JOIN LOBBY ========== -->
     <div class="screen" id="join-lobby-screen" style="display:none;">
         <div class="menu-container">
-            <button class="back-btn" id="back-from-join">← Geri</button>
-            <h2 class="screen-title">🚪 Odaya Katıl</h2>
+            <button class="back-btn" id="back-from-join">← Back</button>
+            <h2 class="screen-title">🚪 Join Lobby</h2>
             <div class="join-form">
-                <label class="menu-label">Oda Kodunu Gir</label>
+                <label class="menu-label">Enter Room Code</label>
                 <div class="join-input-row">
                     <input type="text" class="menu-input code-input" id="room-code-input"
                            placeholder="ABCD" maxlength="4" autocomplete="off"
                            style="text-transform:uppercase; letter-spacing:8px; text-align:center; font-size:24px; font-weight:800;">
-                    <button class="lobby-start-btn join-code-btn" id="join-code-btn">Katıl</button>
+                    <button class="lobby-start-btn join-code-btn" id="join-code-btn">Join</button>
                 </div>
             </div>
             <div class="available-lobbies">
-                <div class="menu-label" style="margin-bottom:10px;">Açık Odalar</div>
+                <div class="menu-label" style="margin-bottom:10px;">Available Lobbies</div>
                 <div class="lobby-list" id="lobby-list">
-                    <div class="empty-lobbies">Açık oda bulunamadı</div>
+                    <div class="empty-lobbies">No open lobbies found</div>
                 </div>
             </div>
         </div>
@@ -105,34 +105,34 @@
     <!-- ========== LOBBY ROOM ========== -->
     <div class="screen" id="lobby-room-screen" style="display:none;">
         <div class="menu-container">
-            <button class="back-btn" id="back-from-room">← Ayrıl</button>
-            <h2 class="screen-title">🏠 Oda</h2>
+            <button class="back-btn" id="back-from-room">← Leave</button>
+            <h2 class="screen-title">🏠 Lobby</h2>
             <div class="room-code-display">
-                <span class="room-code-label">Oda Kodu</span>
+                <span class="room-code-label">Room Code</span>
                 <span class="room-code" id="room-code-display">ABCD</span>
-                <button class="copy-code-btn" id="copy-code-btn" title="Kodu kopyala">📋</button>
+                <button class="copy-code-btn" id="copy-code-btn" title="Copy code">📋</button>
             </div>
             <div class="room-settings-info" id="room-settings-info"></div>
             <div class="room-players" id="room-players"></div>
-            <div class="room-player-count" id="room-player-count">0/4 oyuncu</div>
-            <button class="lobby-start-btn" id="room-start-btn" disabled><span>🎮</span> Oyunu Başlat</button>
+            <div class="room-player-count" id="room-player-count">0/4 players</div>
+            <button class="lobby-start-btn" id="room-start-btn" disabled><span>🎮</span> Start Game</button>
         </div>
     </div>
 
     <!-- ========== GAME SCREEN ========== -->
     <div class="screen game-container" id="game-screen" style="display:none;">
         <header class="game-header">
-            <div class="logo"><span class="logo-icon">✨</span><h1>KelimeBul</h1></div>
+            <div class="logo"><span class="logo-icon">✨</span><h1>WordFinder</h1></div>
             <div class="header-actions">
-                <button class="icon-btn" id="mute-btn" title="Sesi Aç/Kapat">🔊</button>
-                <button class="icon-btn leave-game-btn" id="leave-game-btn" title="Oyundan Ayrıl">🚪</button>
+                <button class="icon-btn" id="mute-btn" title="Toggle Sound">🔊</button>
+                <button class="icon-btn leave-game-btn" id="leave-game-btn" title="Leave Game">🚪</button>
             </div>
         </header>
         <div class="scoreboard" id="scoreboard"></div>
         <div class="turn-indicator" id="turn-indicator">Player 1's Turn</div>
         <div class="word-display">
             <div class="current-word-container">
-                <span class="current-word" id="current-word">Kelime seç...</span>
+                <span class="current-word" id="current-word">Select word...</span>
                 <span class="word-score" id="word-score"></span>
             </div>
             <div class="word-validation" id="word-validation"></div>
@@ -140,24 +140,24 @@
         <div class="board-container"><div class="game-board" id="game-board"></div></div>
         <div class="action-buttons">
             <button class="action-btn submit-btn" id="submit-btn" disabled>
-                <span class="btn-icon">✓</span><span class="btn-text">GÖNDER</span>
+                <span class="btn-icon">✓</span><span class="btn-text">SUBMIT</span>
             </button>
             <button class="action-btn clear-btn" id="clear-btn">
-                <span class="btn-icon">↺</span><span class="btn-text">TEMİZLE</span>
+                <span class="btn-icon">↺</span><span class="btn-text">CLEAR</span>
             </button>
         </div>
         <div class="powerups">
-            <button class="powerup-btn" id="shuffle-btn" data-cost="3"><span class="powerup-icon">🔀</span><span class="powerup-name">Karıştır</span><span class="powerup-cost">💎 3</span></button>
-            <button class="powerup-btn" id="swap-btn" data-cost="2"><span class="powerup-icon">🔄</span><span class="powerup-name">Değiştir</span><span class="powerup-cost">💎 2</span></button>
-            <button class="powerup-btn" id="hint-btn" data-cost="1"><span class="powerup-icon">💡</span><span class="powerup-name">İpucu</span><span class="powerup-cost">💎 1</span></button>
+            <button class="powerup-btn" id="shuffle-btn" data-cost="3"><span class="powerup-icon">🔀</span><span class="powerup-name">Shuffle</span><span class="powerup-cost">💎 3</span></button>
+            <button class="powerup-btn" id="swap-btn" data-cost="2"><span class="powerup-icon">🔄</span><span class="powerup-name">Swap</span><span class="powerup-cost">💎 2</span></button>
+            <button class="powerup-btn" id="hint-btn" data-cost="1"><span class="powerup-icon">💡</span><span class="powerup-name">Hint</span><span class="powerup-cost">💎 1</span></button>
         </div>
         <div class="legend">
-            <div class="legend-title">Bonus Taşlar</div>
+            <div class="legend-title">Bonus Tiles</div>
             <div class="legend-items">
-                <div class="legend-item"><div class="legend-tile double-letter">A</div><span>2x Harf</span></div>
-                <div class="legend-item"><div class="legend-tile triple-letter">B</div><span>3x Harf</span></div>
-                <div class="legend-item"><div class="legend-tile double-word">C</div><span>2x Kelime</span></div>
-                <div class="legend-item"><div class="legend-tile gem-tile">D<span class="gem-indicator">💎</span></div><span>Taş</span></div>
+                <div class="legend-item"><div class="legend-tile double-letter">A</div><span>2x Letter</span></div>
+                <div class="legend-item"><div class="legend-tile triple-letter">B</div><span>3x Letter</span></div>
+                <div class="legend-item"><div class="legend-tile double-word">C</div><span>2x Word</span></div>
+                <div class="legend-item"><div class="legend-tile gem-tile">D<span class="gem-indicator">💎</span></div><span>Gem</span></div>
             </div>
         </div>
     </div>
@@ -165,15 +165,15 @@
     <!-- ========== GAME OVER ========== -->
     <div class="modal" id="game-over-modal">
         <div class="modal-content">
-            <h2>🏆 Oyun Bitti!</h2>
+            <h2>🏆 Game Over!</h2>
             <div class="ranking-table" id="ranking-table"></div>
-            <button class="play-again-btn" id="play-again-btn"><span>🔄</span> Ana Menü</button>
+            <button class="play-again-btn" id="play-again-btn"><span>🔄</span> Back to Menu</button>
         </div>
     </div>
 
     <div class="swap-indicator" id="swap-indicator">
-        <span>Değiştirilecek taşları seç</span>
-        <button class="cancel-swap" id="cancel-swap">İptal</button>
+        <span>Select tiles to swap</span>
+        <button class="cancel-swap" id="cancel-swap">Cancel</button>
     </div>
 
     <div class="toast" id="toast">Message</div>
