@@ -22,33 +22,36 @@ const lobbies = {};       // code -> lobby
 const sessions = {};      // token -> session
 const socketMap = {};     // socketId -> token
 
-// ===== Letter Distribution (English Scrabble) =====
+// ===== Letter Distribution (Turkish Scrabble) =====
 const LETTERS = {
-    'E': { count: 12, points: 1 }, 'A': { count: 9, points: 1 },
-    'I': { count: 9, points: 1 },  'O': { count: 8, points: 1 },
-    'N': { count: 6, points: 1 },  'R': { count: 6, points: 1 },
-    'T': { count: 6, points: 1 },  'L': { count: 4, points: 1 },
-    'S': { count: 4, points: 1 },  'U': { count: 4, points: 1 },
-    'D': { count: 4, points: 2 },  'G': { count: 3, points: 2 },
-    'B': { count: 2, points: 3 },  'C': { count: 2, points: 3 },
-    'M': { count: 2, points: 3 },  'P': { count: 2, points: 3 },
-    'F': { count: 2, points: 4 },  'H': { count: 2, points: 4 },
-    'V': { count: 2, points: 4 },  'W': { count: 2, points: 4 },
-    'Y': { count: 2, points: 4 },  'K': { count: 1, points: 5 },
-    'J': { count: 1, points: 8 },  'X': { count: 1, points: 8 },
-    'Q': { count: 1, points: 10 }, 'Z': { count: 1, points: 10 }
+    'A': { count: 12, points: 1 }, 'E': { count: 8, points: 1 },
+    'İ': { count: 7, points: 1 },  'K': { count: 7, points: 1 },
+    'L': { count: 7, points: 1 },  'R': { count: 6, points: 1 },
+    'N': { count: 5, points: 1 },  'T': { count: 5, points: 1 },
+    'I': { count: 4, points: 2 },  'S': { count: 3, points: 2 },
+    'U': { count: 3, points: 2 },  'D': { count: 3, points: 2 },
+    'M': { count: 3, points: 2 },  'O': { count: 2, points: 2 },
+    'Y': { count: 2, points: 3 },  'B': { count: 2, points: 3 },
+    'Ü': { count: 2, points: 3 },  'Ş': { count: 2, points: 4 },
+    'Ç': { count: 2, points: 4 },  'Z': { count: 2, points: 4 },
+    'H': { count: 1, points: 5 },  'G': { count: 1, points: 5 },
+    'P': { count: 1, points: 5 },  'V': { count: 1, points: 7 },
+    'Ö': { count: 1, points: 7 },  'F': { count: 1, points: 7 },
+    'Ğ': { count: 1, points: 8 },  'J': { count: 1, points: 10 }
 };
 
-// ===== Word Validation (Server-Side — no CORS issues) =====
+// ===== Word Validation (TDK Sözlük API — server-side, no CORS) =====
 const wordCache = new Map();
 
 async function isValidWord(word) {
     if (!word || word.length < 2) return false;
-    const lower = word.toLowerCase();
+    const lower = word.toLocaleLowerCase('tr-TR');
     if (wordCache.has(lower)) return wordCache.get(lower);
     try {
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${lower}`);
-        const valid = res.ok;
+        const res = await fetch(`https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lower)}`);
+        const data = await res.json();
+        // TDK returns array if found, or {error: "..."} if not
+        const valid = Array.isArray(data) && data.length > 0;
         wordCache.set(lower, valid);
         return valid;
     } catch { return false; }

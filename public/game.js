@@ -1,9 +1,13 @@
 // ===== WordFinder – Socket.IO Client =====
 
 const LETTERS = {
-    'E': 1, 'A': 1, 'I': 1, 'O': 1, 'N': 1, 'R': 1, 'T': 1, 'L': 1, 'S': 1, 'U': 1,
-    'D': 2, 'G': 2, 'B': 3, 'C': 3, 'M': 3, 'P': 3, 'F': 4, 'H': 4, 'V': 4, 'W': 4,
-    'Y': 4, 'K': 5, 'J': 8, 'X': 8, 'Q': 10, 'Z': 10
+    'A': 1, 'E': 1, 'İ': 1, 'K': 1, 'L': 1, 'R': 1, 'N': 1, 'T': 1,
+    'I': 2, 'S': 2, 'U': 2, 'D': 2, 'M': 2, 'O': 2,
+    'Y': 3, 'B': 3, 'Ü': 3,
+    'Ş': 4, 'Ç': 4, 'Z': 4,
+    'H': 5, 'G': 5, 'P': 5,
+    'V': 7, 'Ö': 7, 'F': 7,
+    'Ğ': 8, 'J': 10
 };
 
 class SpellcastGame {
@@ -84,21 +88,21 @@ class SpellcastGame {
             const vEl = this.elements.wordValidation;
             if (!valid) {
                 window.soundManager.play('invalid');
-                this.showToast('Word not in dictionary!', 'error');
-                vEl.textContent = '✗ Not a word'; vEl.className = 'word-validation invalid';
+                this.showToast('Kelime sözlükte yok!', 'error');
+                vEl.textContent = '✗ Geçersiz kelime'; vEl.className = 'word-validation invalid';
                 this.elements.currentWord.classList.add('shake');
                 setTimeout(() => this.elements.currentWord.classList.remove('shake'), 300);
                 this.elements.submitBtn.disabled = false;
             } else {
                 window.soundManager.play('submit');
-                this.showToast(`+${score} points!`, 'success');
+                this.showToast(`+${score} puan!`, 'success');
             }
         });
 
         this.socket.on('hintResult', ({ word, found }) => {
             this.elements.hintBtn.disabled = false;
-            if (found) this.showToast(`💡 Hint: "${word}"`, 'success');
-            else this.showToast('No word found, try again!', 'error');
+            if (found) this.showToast(`💡 İpucu: "${word}"`, 'success');
+            else this.showToast('Kelime bulunamadı, tekrar dene!', 'error');
         });
 
         this.socket.on('toast', ({ message, type }) => {
@@ -110,11 +114,11 @@ class SpellcastGame {
         });
 
         this.socket.on('disconnect', () => {
-            this.showToast('Connection lost. Reconnecting...', 'error');
+            this.showToast('Bağlantı kesildi. Yeniden bağlanılıyor...', 'error');
         });
 
         this.socket.on('reconnect', () => {
-            this.showToast('Reconnected!', 'success');
+            this.showToast('Yeniden bağlandı!', 'success');
         });
     }
 
@@ -143,15 +147,15 @@ class SpellcastGame {
     }
 
     renderRoom(lobby) {
-        this.roomEls.settingsInfo.textContent = `${lobby.settings.maxPlayers} players · ${lobby.settings.turnsPerPlayer} rounds · 💎 ${lobby.settings.startingGems} gems`;
+        this.roomEls.settingsInfo.textContent = `${lobby.settings.maxPlayers} oyuncu · ${lobby.settings.turnsPerPlayer} tur · 💎 ${lobby.settings.startingGems} taş`;
         const list = this.roomEls.playerList; list.innerHTML = '';
         lobby.players.forEach((p, i) => {
             const card = document.createElement('div');
             card.className = 'room-player-card' + (p.id === lobby.host ? ' host' : '') + (!p.connected ? ' disconnected' : '');
-            card.innerHTML = `<span class="room-player-number">${i + 1}</span><span class="room-player-name">${p.name}${!p.connected ? ' (offline)' : ''}</span>${p.id === lobby.host ? '<span class="room-player-badge">HOST</span>' : ''}`;
+            card.innerHTML = `<span class="room-player-number">${i + 1}</span><span class="room-player-name">${p.name}${!p.connected ? ' (çevrimdışı)' : ''}</span>${p.id === lobby.host ? '<span class="room-player-badge">EV SAHİBİ</span>' : ''}`;
             list.appendChild(card);
         });
-        this.roomEls.playerCount.textContent = `${lobby.players.length}/${lobby.settings.maxPlayers} players`;
+        this.roomEls.playerCount.textContent = `${lobby.players.length}/${lobby.settings.maxPlayers} oyuncu`;
         this.roomEls.startBtn.style.display = this.isHost ? 'flex' : 'none';
         this.roomEls.startBtn.disabled = !this.isHost;
     }
@@ -178,7 +182,7 @@ class SpellcastGame {
         if (this.screens.game.style.display === 'none') this.showScreen('game');
 
         if (lobby.lastAction && lobby.lastAction.playerId !== this.myPlayerId)
-            this.showToast(`${lobby.lastAction.playerName}: +${lobby.lastAction.score} pts (${lobby.lastAction.word})`, 'info');
+            this.showToast(`${lobby.lastAction.playerName}: +${lobby.lastAction.score} puan (${lobby.lastAction.word})`, 'info');
 
         this.clearSelection(); this.renderScoreboard(); this.renderBoard(); this.updateUI(); this.updateWordDisplay(); this.applyTurnState();
     }
@@ -225,10 +229,10 @@ class SpellcastGame {
         this.elements.clearBtn.addEventListener('click', () => { window.soundManager.play('click'); this.clearSelection(); });
         this.elements.shuffleBtn.addEventListener('click', () => { window.soundManager.play('click'); this.socket.emit('useShuffle'); });
         this.elements.swapBtn.addEventListener('click', () => { window.soundManager.play('click'); this.startSwapMode(); });
-        this.elements.hintBtn.addEventListener('click', () => { window.soundManager.play('click'); this.elements.hintBtn.disabled = true; this.showToast('Searching...', 'info'); this.socket.emit('useHint'); });
+        this.elements.hintBtn.addEventListener('click', () => { window.soundManager.play('click'); this.elements.hintBtn.disabled = true; this.showToast('Aranıyor...', 'info'); this.socket.emit('useHint'); });
         this.elements.playAgainBtn.addEventListener('click', () => { window.soundManager.play('click'); this.backToMenu(); });
         this.elements.cancelSwap.addEventListener('click', () => { window.soundManager.play('click'); this.cancelSwapMode(); });
-        this.elements.leaveGameBtn.addEventListener('click', () => { if (confirm('Are you sure you want to leave the game?')) { this.socket.emit('leaveGame'); this.currentLobbyCode = null; this.showScreen('mainMenu'); } });
+        this.elements.leaveGameBtn.addEventListener('click', () => { if (confirm('Oyundan ayrılmak istediğine emin misin?')) { this.socket.emit('leaveGame'); this.currentLobbyCode = null; this.showScreen('mainMenu'); } });
         this.elements.muteBtn.addEventListener('click', () => { const m = window.soundManager.toggleMute(); this.elements.muteBtn.textContent = m ? '🔇' : '🔊'; });
         document.addEventListener('keydown', (e) => {
             if (this.screens.game.style.display === 'none') return;
@@ -241,7 +245,7 @@ class SpellcastGame {
     // ===========================================================
     validateNickname() {
         const name = this.menuEls.nicknameInput.value.trim();
-        if (!name) { this.showToast('Please enter a nickname!', 'error'); return null; } return name;
+        if (!name) { this.showToast('Lütfen bir rumuz gir!', 'error'); return null; } return name;
     }
 
     goToCreateLobby() {
@@ -267,23 +271,23 @@ class SpellcastGame {
 
     joinByCode() {
         const code = this.joinEls.codeInput.value.trim().toUpperCase();
-        if (code.length !== 4) { this.showToast('Enter a 4-character code!', 'error'); return; }
+        if (code.length !== 4) { this.showToast('4 haneli bir kod gir!', 'error'); return; }
         this.socket.emit('joinLobby', { name: this.myName, code });
     }
 
     renderLobbyList(lobbies) {
         const list = this.joinEls.lobbyList; list.innerHTML = '';
-        if (lobbies.length === 0) { list.innerHTML = '<div class="empty-lobbies">No open lobbies found</div>'; return; }
+        if (lobbies.length === 0) { list.innerHTML = '<div class="empty-lobbies">Açık oda bulunamadı</div>'; return; }
         lobbies.forEach(l => {
             const card = document.createElement('div'); card.className = 'lobby-list-card';
-            card.innerHTML = `<div class="lobby-list-info"><span class="lobby-list-host">${l.hostName}'s Lobby</span><span class="lobby-list-meta">${l.playerCount}/${l.maxPlayers} players · ${l.turnsPerPlayer} rounds</span></div><span class="lobby-list-code">${l.code}</span>`;
+            card.innerHTML = `<div class="lobby-list-info"><span class="lobby-list-host">${l.hostName} Odası</span><span class="lobby-list-meta">${l.playerCount}/${l.maxPlayers} oyuncu · ${l.turnsPerPlayer} tur</span></div><span class="lobby-list-code">${l.code}</span>`;
             card.addEventListener('click', () => { this.socket.emit('joinLobby', { name: this.myName, code: l.code }); });
             list.appendChild(card);
         });
     }
 
     leaveLobby() { this.socket.emit('leaveLobby'); this.currentLobbyCode = null; this.showScreen('mainMenu'); }
-    copyRoomCode() { navigator.clipboard.writeText(this.currentLobbyCode).then(() => this.showToast('Code copied!', 'success')).catch(() => this.showToast(this.currentLobbyCode, 'info')); }
+    copyRoomCode() { navigator.clipboard.writeText(this.currentLobbyCode).then(() => this.showToast('Kod kopyalandı!', 'success')).catch(() => this.showToast(this.currentLobbyCode, 'info')); }
 
     // ===========================================================
     //  RENDER
@@ -305,7 +309,7 @@ class SpellcastGame {
             const card = document.createElement('div');
             card.className = 'player-card' + (i === this.currentPlayerIndex ? ' active' : '') + (!p.connected ? ' disconnected' : '');
             card.id = `player-card-${i}`;
-            card.innerHTML = `<span class="p-name">${p.name}${p.id === this.myPlayerId ? ' (You)' : ''}${!p.connected ? ' ⚠️' : ''}</span><span class="p-score">${p.score}</span><span class="p-gems">💎 ${p.gems}</span>`;
+            card.innerHTML = `<span class="p-name">${p.name}${p.id === this.myPlayerId ? ' (Sen)' : ''}${!p.connected ? ' ⚠️' : ''}</span><span class="p-score">${p.score}</span><span class="p-gems">💎 ${p.gems}</span>`;
             sb.appendChild(card);
         });
     }
@@ -351,7 +355,7 @@ class SpellcastGame {
     updateWordDisplay() {
         const wEl = this.elements.currentWord, sEl = this.elements.wordScore;
         this.elements.wordValidation.textContent = ''; this.elements.wordValidation.className = 'word-validation';
-        if (this.currentWord.length === 0) { wEl.textContent = this.isMyTurn ? 'Select word...' : 'Waiting...'; wEl.classList.remove('has-word'); sEl.classList.remove('visible'); this.elements.submitBtn.disabled = true; return; }
+        if (this.currentWord.length === 0) { wEl.textContent = this.isMyTurn ? 'Kelime seç...' : 'Bekliyor...'; wEl.classList.remove('has-word'); sEl.classList.remove('visible'); this.elements.submitBtn.disabled = true; return; }
         wEl.textContent = this.currentWord; wEl.classList.add('has-word');
         sEl.textContent = `+${this.calculateScore()}`; sEl.classList.add('visible'); this.elements.submitBtn.disabled = false;
     }
@@ -367,10 +371,10 @@ class SpellcastGame {
     // ===========================================================
     submitWord() {
         if (!this.isMyTurn || this.selectedTiles.length < 2) {
-            if (this.selectedTiles.length < 2) { this.showToast('Word too short!', 'error'); this.elements.currentWord.classList.add('shake'); setTimeout(() => this.elements.currentWord.classList.remove('shake'), 300); }
+            if (this.selectedTiles.length < 2) { this.showToast('Kelime çok kısa!', 'error'); this.elements.currentWord.classList.add('shake'); setTimeout(() => this.elements.currentWord.classList.remove('shake'), 300); }
             return;
         }
-        this.elements.wordValidation.textContent = 'Checking...'; this.elements.wordValidation.className = 'word-validation';
+        this.elements.wordValidation.textContent = 'Kontrol ediliyor...'; this.elements.wordValidation.className = 'word-validation';
         this.elements.submitBtn.disabled = true;
         const tiles = this.selectedTiles.map(t => ({ row: t.row, col: t.col }));
         this.socket.emit('submitWord', { tiles });
@@ -382,9 +386,9 @@ class SpellcastGame {
     startSwapMode() {
         if (!this.isMyTurn) return;
         const myP = this.players.find(p => p.id === this.myPlayerId);
-        if (!myP || myP.gems < 2) { this.showToast('Not enough gems!', 'error'); return; }
+        if (!myP || myP.gems < 2) { this.showToast('Yeterli taş yok!', 'error'); return; }
         this.isSwapMode = true; this.swapFirstTile = null; this.clearSelection();
-        this.elements.swapIndicator.classList.add('active'); this.showToast('Select first tile', 'info');
+        this.elements.swapIndicator.classList.add('active'); this.showToast('İlk taşı seç', 'info');
     }
 
     cancelSwapMode() { this.isSwapMode = false; this.swapFirstTile = null; this.elements.swapIndicator.classList.remove('active'); this.elements.board.querySelectorAll('.tile').forEach(t => t.classList.remove('swap-selected')); }
@@ -392,9 +396,9 @@ class SpellcastGame {
     swapTile(row, col) {
         if (!this.isMyTurn) return;
         const el = this.elements.board.children[row * 5 + col];
-        if (!this.swapFirstTile) { this.swapFirstTile = { row, col }; el.classList.add('swap-selected'); this.showToast('Select second tile', 'info'); }
+        if (!this.swapFirstTile) { this.swapFirstTile = { row, col }; el.classList.add('swap-selected'); this.showToast('İkinci taşı seç', 'info'); }
         else {
-            if (this.swapFirstTile.row === row && this.swapFirstTile.col === col) { this.showToast('Pick a different tile!', 'error'); return; }
+            if (this.swapFirstTile.row === row && this.swapFirstTile.col === col) { this.showToast('Farklı bir taş seç!', 'error'); return; }
             this.socket.emit('useSwap', { tile1: this.swapFirstTile, tile2: { row, col } });
             this.isSwapMode = false; this.swapFirstTile = null; this.elements.swapIndicator.classList.remove('active');
         }
@@ -417,10 +421,10 @@ class SpellcastGame {
         const player = this.players[this.currentPlayerIndex]; if (!player) return;
         const round = Math.floor(this.currentTurn / this.players.length) + 1;
         if (this.isMyTurn) {
-            this.elements.turnIndicator.textContent = `Your Turn! — Round ${round}/${this.lobbySettings.turnsPerPlayer}`;
+            this.elements.turnIndicator.textContent = `Senin Sıran! — Tur ${round}/${this.lobbySettings.turnsPerPlayer}`;
             this.elements.turnIndicator.style.borderColor = 'rgba(16,185,129,0.4)'; this.elements.turnIndicator.style.color = 'var(--success)'; this.elements.turnIndicator.style.background = 'rgba(16,185,129,0.1)';
         } else {
-            this.elements.turnIndicator.textContent = `${player.name}'s Turn — Round ${round}/${this.lobbySettings.turnsPerPlayer}`;
+            this.elements.turnIndicator.textContent = `${player.name} Oynuyor — Tur ${round}/${this.lobbySettings.turnsPerPlayer}`;
             this.elements.turnIndicator.style.borderColor = ''; this.elements.turnIndicator.style.color = ''; this.elements.turnIndicator.style.background = '';
         }
         this.players.forEach((p, i) => { const card = document.getElementById(`player-card-${i}`); if (!card) return; card.querySelector('.p-score').textContent = p.score; card.querySelector('.p-gems').textContent = `💎 ${p.gems}`; card.classList.toggle('active', i === this.currentPlayerIndex); });
@@ -445,7 +449,7 @@ class SpellcastGame {
         ranking.forEach((p, i) => {
             const row = document.createElement('div');
             row.className = 'ranking-row' + (i === 0 ? ' winner' : '');
-            row.innerHTML = `<span class="ranking-position">${medals[i] || i + 1}</span><span class="ranking-name">${p.name}${p.id === this.myPlayerId ? ' (You)' : ''}</span><div class="ranking-stats"><span class="ranking-score">${p.score} pts</span><span class="ranking-words">${p.wordsCount} words</span></div>`;
+            row.innerHTML = `<span class="ranking-position">${medals[i] || i + 1}</span><span class="ranking-name">${p.name}${p.id === this.myPlayerId ? ' (Sen)' : ''}</span><div class="ranking-stats"><span class="ranking-score">${p.score} puan</span><span class="ranking-words">${p.wordsCount} kelime</span></div>`;
             table.appendChild(row);
         });
         this.elements.modal.classList.add('active');
@@ -461,4 +465,4 @@ class SpellcastGame {
     showToast(message, type = 'info') { const t = this.elements.toast; t.textContent = message; t.className = `toast active ${type}`; setTimeout(() => t.classList.remove('active'), 2500); }
 }
 
-document.addEventListener('DOMContentLoaded', () => { window.game = new SpellcastGame(); });
+document.addEventListener('DOMContentLoaded', () => { window.game = new WordFinderGame(); });

@@ -1,6 +1,6 @@
 # WordFinder — Multiplayer Word Game
 
-A browser-based multiplayer word game inspired by Discord's Spellcast. Built with Node.js, Socket.IO, and vanilla JavaScript.
+A browser-based multiplayer word game. Connect letters, form words, and compete with friends! Built with Node.js, Socket.IO, and vanilla JavaScript.
 
 ## 🎮 How to Play
 
