@@ -358,6 +358,38 @@ body {
     z-index: 1;
 }
 
+.tile.opponent-selected {
+    border-color: #22d3ee;
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
+    animation: opponentPulse 1s ease-in-out infinite;
+}
+
+@keyframes opponentPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(34, 211, 238, 0.4); }
+    50% { box-shadow: 0 0 18px rgba(34, 211, 238, 0.7); }
+}
+
+.turn-timer {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.turn-timer.urgent {
+    background: rgba(239, 68, 68, 0.25);
+    color: var(--error);
+    animation: timerBlink 0.5s ease-in-out infinite;
+}
+
+@keyframes timerBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 .tile-letter {
     line-height: 1;
     z-index: 1;

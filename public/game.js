@@ -6,7 +6,7 @@ const LETTERS = {
     'Y': 4, 'K': 5, 'J': 8, 'X': 8, 'Q': 10, 'Z': 10
 };
 
-class SpellcastGame {
+class WordFinderGame {
     constructor() {
         this.socket = io();
         this.token = localStorage.getItem('wf_token');
@@ -14,7 +14,7 @@ class SpellcastGame {
         this.myName = '';
         this.currentLobbyCode = null;
         this.isHost = false;
-        this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5 };
+        this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0 };
 
         this.players = [];
         this.playerOrder = [];
@@ -28,6 +28,9 @@ class SpellcastGame {
         this.currentWord = '';
         this.isSwapMode = false;
         this.swapFirstTile = null;
+        this.lastSeenActionId = 0;
+        this.timerInterval = null;
+        this.turnDeadline = null;
 
         // DOM
         this.screens = {
@@ -38,7 +41,7 @@ class SpellcastGame {
             game: document.getElementById('game-screen'),
         };
         this.menuEls = { nicknameInput: document.getElementById('nickname-input'), createBtn: document.getElementById('create-lobby-btn'), joinBtn: document.getElementById('join-lobby-btn') };
-        this.createEls = { backBtn: document.getElementById('back-from-create'), confirmBtn: document.getElementById('confirm-create-btn'), maxPlayersValue: document.getElementById('max-players-value'), maxPlayersDown: document.getElementById('max-players-down'), maxPlayersUp: document.getElementById('max-players-up'), roundsValue: document.getElementById('rounds-value'), roundsDown: document.getElementById('rounds-down'), roundsUp: document.getElementById('rounds-up'), gemsValue: document.getElementById('gems-value'), gemsDown: document.getElementById('gems-down'), gemsUp: document.getElementById('gems-up') };
+        this.createEls = { backBtn: document.getElementById('back-from-create'), confirmBtn: document.getElementById('confirm-create-btn'), maxPlayersValue: document.getElementById('max-players-value'), maxPlayersDown: document.getElementById('max-players-down'), maxPlayersUp: document.getElementById('max-players-up'), roundsValue: document.getElementById('rounds-value'), roundsDown: document.getElementById('rounds-down'), roundsUp: document.getElementById('rounds-up'), gemsValue: document.getElementById('gems-value'), gemsDown: document.getElementById('gems-down'), gemsUp: document.getElementById('gems-up'), timerValue: document.getElementById('timer-value'), timerDown: document.getElementById('timer-down'), timerUp: document.getElementById('timer-up') };
         this.joinEls = { backBtn: document.getElementById('back-from-join'), codeInput: document.getElementById('room-code-input'), joinCodeBtn: document.getElementById('join-code-btn'), lobbyList: document.getElementById('lobby-list') };
         this.roomEls = { backBtn: document.getElementById('back-from-room'), codeDisplay: document.getElementById('room-code-display'), copyBtn: document.getElementById('copy-code-btn'), settingsInfo: document.getElementById('room-settings-info'), playerList: document.getElementById('room-players'), playerCount: document.getElementById('room-player-count'), startBtn: document.getElementById('room-start-btn') };
         this.elements = { board: document.getElementById('game-board'), currentWord: document.getElementById('current-word'), wordScore: document.getElementById('word-score'), wordValidation: document.getElementById('word-validation'), scoreboard: document.getElementById('scoreboard'), turnIndicator: document.getElementById('turn-indicator'), submitBtn: document.getElementById('submit-btn'), clearBtn: document.getElementById('clear-btn'), shuffleBtn: document.getElementById('shuffle-btn'), swapBtn: document.getElementById('swap-btn'), hintBtn: document.getElementById('hint-btn'), modal: document.getElementById('game-over-modal'), rankingTable: document.getElementById('ranking-table'), playAgainBtn: document.getElementById('play-again-btn'), swapIndicator: document.getElementById('swap-indicator'), cancelSwap: document.getElementById('cancel-swap'), muteBtn: document.getElementById('mute-btn'), leaveGameBtn: document.getElementById('leave-game-btn'), toast: document.getElementById('toast') };
@@ -116,6 +119,11 @@ class SpellcastGame {
         this.socket.on('reconnect', () => {
             this.showToast('Reconnected!', 'success');
         });
+
+        // Opponent live tile selection
+        this.socket.on('opponentSelection', ({ playerId, playerName, tiles }) => {
+            this.renderOpponentSelection(playerId, playerName, tiles);
+        });
     }
 
     // ===========================================================
@@ -143,7 +151,8 @@ class SpellcastGame {
     }
 
     renderRoom(lobby) {
-        this.roomEls.settingsInfo.textContent = `${lobby.settings.maxPlayers} players · ${lobby.settings.turnsPerPlayer} rounds · 💎 ${lobby.settings.startingGems} gems`;
+        const timerText = lobby.settings.turnTime > 0 ? ` · ⏱ ${lobby.settings.turnTime}s` : '';
+        this.roomEls.settingsInfo.textContent = `${lobby.settings.maxPlayers} players · ${lobby.settings.turnsPerPlayer} rounds · 💎 ${lobby.settings.startingGems} gems${timerText}`;
         const list = this.roomEls.playerList; list.innerHTML = '';
         lobby.players.forEach((p, i) => {
             const card = document.createElement('div');
@@ -173,12 +182,19 @@ class SpellcastGame {
 
         if (lobby.status === 'finished' || this.currentTurn >= this.totalTurns) {
             if (this.screens.game.style.display === 'none') this.showScreen('game');
+            this.stopTimerDisplay();
             this.renderScoreboard(); this.renderBoard(); this.updateUI(); this.endGame(); return;
         }
         if (this.screens.game.style.display === 'none') this.showScreen('game');
 
-        if (lobby.lastAction && lobby.lastAction.playerId !== this.myPlayerId)
+        // Dedup lastAction toast using lastActionId
+        if (lobby.lastAction && lobby.lastAction.playerId !== this.myPlayerId && lobby.lastActionId > this.lastSeenActionId)
             this.showToast(`${lobby.lastAction.playerName}: +${lobby.lastAction.score} pts (${lobby.lastAction.word})`, 'info');
+        this.lastSeenActionId = lobby.lastActionId || 0;
+
+        // Update turn deadline for timer
+        this.turnDeadline = lobby.turnDeadline;
+        this.startTimerDisplay();
 
         this.clearSelection(); this.renderScoreboard(); this.renderBoard(); this.updateUI(); this.updateWordDisplay(); this.applyTurnState();
     }
@@ -215,6 +231,8 @@ class SpellcastGame {
         this.createEls.roundsUp.addEventListener('click', () => this.stepSetting('turnsPerPlayer', 1, 1, 20));
         this.createEls.gemsDown.addEventListener('click', () => this.stepSetting('startingGems', -1, 0, 15));
         this.createEls.gemsUp.addEventListener('click', () => this.stepSetting('startingGems', 1, 0, 15));
+        this.createEls.timerDown.addEventListener('click', () => this.stepTimerSetting(-15));
+        this.createEls.timerUp.addEventListener('click', () => this.stepTimerSetting(15));
         this.joinEls.backBtn.addEventListener('click', () => this.showScreen('mainMenu'));
         this.joinEls.joinCodeBtn.addEventListener('click', () => this.joinByCode());
         this.joinEls.codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.joinByCode(); });
@@ -246,7 +264,7 @@ class SpellcastGame {
 
     goToCreateLobby() {
         const name = this.validateNickname(); if (!name) return;
-        this.myName = name; this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5 };
+        this.myName = name; this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0 };
         this.updateSettingsDisplay(); this.showScreen('createLobby');
     }
 
@@ -261,7 +279,8 @@ class SpellcastGame {
     //  CREATE / JOIN
     // ===========================================================
     stepSetting(key, delta, min, max) { this.lobbySettings[key] = Math.max(min, Math.min(max, this.lobbySettings[key] + delta)); this.updateSettingsDisplay(); }
-    updateSettingsDisplay() { this.createEls.maxPlayersValue.textContent = this.lobbySettings.maxPlayers; this.createEls.roundsValue.textContent = this.lobbySettings.turnsPerPlayer; this.createEls.gemsValue.textContent = this.lobbySettings.startingGems; }
+    stepTimerSetting(delta) { this.lobbySettings.turnTime = Math.max(0, Math.min(120, this.lobbySettings.turnTime + delta)); this.updateSettingsDisplay(); }
+    updateSettingsDisplay() { this.createEls.maxPlayersValue.textContent = this.lobbySettings.maxPlayers; this.createEls.roundsValue.textContent = this.lobbySettings.turnsPerPlayer; this.createEls.gemsValue.textContent = this.lobbySettings.startingGems; this.createEls.timerValue.textContent = this.lobbySettings.turnTime > 0 ? `${this.lobbySettings.turnTime}s` : 'Off'; }
 
     createLobby() { this.socket.emit('createLobby', { name: this.myName, settings: this.lobbySettings }); }
 
@@ -324,8 +343,10 @@ class SpellcastGame {
     isAdjacent(row, col) { if (this.selectedTiles.length === 0) return true; const l = this.selectedTiles[this.selectedTiles.length - 1]; const rd = Math.abs(l.row - row), cd = Math.abs(l.col - col); return rd <= 1 && cd <= 1 && !(rd === 0 && cd === 0); }
     isAdjacentTo(r1, c1, r2, c2) { const rd = Math.abs(r1 - r2), cd = Math.abs(c1 - c2); return rd <= 1 && cd <= 1 && !(rd === 0 && cd === 0); }
 
-    selectTile(row, col) { const t = this.board[row][col]; t.selected = true; this.selectedTiles.push(t); this.currentWord += t.letter; this.updateTileUI(row, col, true); this.updateWordDisplay(); this.highlightAdjacentTiles(); }
-    unselectTile(row, col) { const t = this.board[row][col]; t.selected = false; this.selectedTiles.pop(); this.currentWord = this.currentWord.slice(0, -1); this.updateTileUI(row, col, false); this.updateWordDisplay(); this.highlightAdjacentTiles(); }
+    selectTile(row, col) { const t = this.board[row][col]; t.selected = true; this.selectedTiles.push(t); this.currentWord += t.letter; this.updateTileUI(row, col, true); this.updateWordDisplay(); this.highlightAdjacentTiles(); this.emitTileSelect(); }
+    unselectTile(row, col) { const t = this.board[row][col]; t.selected = false; this.selectedTiles.pop(); this.currentWord = this.currentWord.slice(0, -1); this.updateTileUI(row, col, false); this.updateWordDisplay(); this.highlightAdjacentTiles(); this.emitTileSelect(); }
+
+    emitTileSelect() { this.socket.emit('tileSelect', { tiles: this.selectedTiles.map(t => ({ row: t.row, col: t.col })) }); }
 
     updateTileUI(row, col, selected) {
         const el = this.elements.board.children[row * 5 + col];
@@ -408,6 +429,40 @@ class SpellcastGame {
         this.selectedTiles = []; this.currentWord = '';
         this.elements.board.querySelectorAll('.tile').forEach(t => t.classList.remove('adjacent-hint', 'disabled'));
         this.updateWordDisplay();
+        this.emitTileSelect();
+    }
+
+    // Render opponent tile highlights
+    renderOpponentSelection(playerId, playerName, tiles) {
+        // Clear previous opponent highlights
+        this.elements.board.querySelectorAll('.tile').forEach(t => t.classList.remove('opponent-selected'));
+        if (!tiles || tiles.length === 0) return;
+        for (const { row, col } of tiles) {
+            const el = this.elements.board.children[row * 5 + col];
+            if (el) el.classList.add('opponent-selected');
+        }
+    }
+
+    // Timer display
+    startTimerDisplay() {
+        this.stopTimerDisplay();
+        if (!this.turnDeadline || !this.lobbySettings.turnTime) return;
+        this.timerInterval = setInterval(() => this.updateTimerDisplay(), 250);
+        this.updateTimerDisplay();
+    }
+
+    stopTimerDisplay() {
+        if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+    }
+
+    updateTimerDisplay() {
+        if (!this.turnDeadline) return;
+        const remaining = Math.max(0, Math.ceil((this.turnDeadline - Date.now()) / 1000));
+        const timerEl = document.getElementById('turn-timer');
+        if (timerEl) {
+            timerEl.textContent = `⏱ ${remaining}s`;
+            timerEl.className = 'turn-timer' + (remaining <= 5 ? ' urgent' : '');
+        }
     }
 
     // ===========================================================
@@ -416,13 +471,15 @@ class SpellcastGame {
     updateUI() {
         const player = this.players[this.currentPlayerIndex]; if (!player) return;
         const round = Math.floor(this.currentTurn / this.players.length) + 1;
+        const timerHtml = (this.lobbySettings.turnTime > 0) ? ' <span id="turn-timer" class="turn-timer"></span>' : '';
         if (this.isMyTurn) {
-            this.elements.turnIndicator.textContent = `Your Turn! — Round ${round}/${this.lobbySettings.turnsPerPlayer}`;
+            this.elements.turnIndicator.innerHTML = `Your Turn! — Round ${round}/${this.lobbySettings.turnsPerPlayer}${timerHtml}`;
             this.elements.turnIndicator.style.borderColor = 'rgba(16,185,129,0.4)'; this.elements.turnIndicator.style.color = 'var(--success)'; this.elements.turnIndicator.style.background = 'rgba(16,185,129,0.1)';
         } else {
-            this.elements.turnIndicator.textContent = `${player.name}'s Turn — Round ${round}/${this.lobbySettings.turnsPerPlayer}`;
+            this.elements.turnIndicator.innerHTML = `${player.name}'s Turn — Round ${round}/${this.lobbySettings.turnsPerPlayer}${timerHtml}`;
             this.elements.turnIndicator.style.borderColor = ''; this.elements.turnIndicator.style.color = ''; this.elements.turnIndicator.style.background = '';
         }
+        this.updateTimerDisplay();
         this.players.forEach((p, i) => { const card = document.getElementById(`player-card-${i}`); if (!card) return; card.querySelector('.p-score').textContent = p.score; card.querySelector('.p-gems').textContent = `💎 ${p.gems}`; card.classList.toggle('active', i === this.currentPlayerIndex); });
         this.updatePowerupButtons();
     }
@@ -461,4 +518,4 @@ class SpellcastGame {
     showToast(message, type = 'info') { const t = this.elements.toast; t.textContent = message; t.className = `toast active ${type}`; setTimeout(() => t.classList.remove('active'), 2500); }
 }
 
-document.addEventListener('DOMContentLoaded', () => { window.game = new SpellcastGame(); });
+document.addEventListener('DOMContentLoaded', () => { window.game = new WordFinderGame(); });

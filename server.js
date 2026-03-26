@@ -21,6 +21,7 @@ const RECONNECT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 const lobbies = {};       // code -> lobby
 const sessions = {};      // token -> session
 const socketMap = {};     // socketId -> token
+const turnTimers = {};    // lobbyCode -> timeout handle
 
 // ===== Letter Distribution (English Scrabble) =====
 const LETTERS = {
@@ -136,28 +137,31 @@ function refillUsedTiles(board, tiles) {
         const nl = keys[Math.floor(Math.random() * keys.length)];
         board[row][col].letter = nl;
         board[row][col].points = LETTERS[nl].points;
-        board[row][col].hasGem = Math.random() < 0.1;
+        board[row][col].hasGem = false;
         board[row][col].bonus = null;
     }
 }
 
-function shuffleLetterBonuses(board) {
-    const bonuses = [];
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-        const t = board[r][c];
-        if (t.bonus === 'double-letter' || t.bonus === 'triple-letter') { bonuses.push(t.bonus); t.bonus = null; }
+// Respawn consumed bonuses & gems on random empty tiles
+function respawnBonuses(board, usedBonuses, usedGemCount) {
+    const getEmpty = () => {
+        const avail = [];
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++)
+            if (!board[r][c].bonus && !board[r][c].hasGem) avail.push({ r, c });
+        return avail;
+    };
+    for (const bonus of usedBonuses) {
+        const avail = getEmpty();
+        if (avail.length > 0) { const p = avail[Math.floor(Math.random() * avail.length)]; board[p.r][p.c].bonus = bonus; }
     }
-    const avail = [];
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (board[r][c].bonus !== 'double-word') avail.push({ r, c });
-    for (let i = avail.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [avail[i], avail[j]] = [avail[j], avail[i]]; }
-    for (let i = 0; i < bonuses.length && i < avail.length; i++) board[avail[i].r][avail[i].c].bonus = bonuses[i];
+    for (let i = 0; i < usedGemCount; i++) {
+        const avail = getEmpty();
+        if (avail.length > 0) { const p = avail[Math.floor(Math.random() * avail.length)]; board[p.r][p.c].hasGem = true; }
+    }
 }
 
-function addNewDoubleWordBonus(board) {
-    const avail = [];
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (!board[r][c].bonus) avail.push({ r, c });
-    if (avail.length > 0) { const p = avail[Math.floor(Math.random() * avail.length)]; board[p.r][p.c].bonus = 'double-word'; }
-}
+
+
 
 function shuffleBoardLetters(board) {
     const letters = [];
@@ -183,6 +187,43 @@ function findTwoLetterPairs(board) {
     return [...pairs];
 }
 
+// ===== Turn timer helpers =====
+function startTurnTimer(lobby) {
+    clearTurnTimer(lobby.code);
+    if (!lobby.settings.turnTime || lobby.settings.turnTime <= 0) return;
+    lobby.turnDeadline = Date.now() + lobby.settings.turnTime * 1000;
+    turnTimers[lobby.code] = setTimeout(() => {
+        if (!lobby || lobby.status !== 'playing') return;
+        // Auto-skip: advance turn without scoring
+        lobby.currentPlayerIndex = (lobby.currentPlayerIndex + 1) % lobby.playerOrder.length;
+        lobby.currentTurn++;
+        lobby.lastAction = null;
+        lobby.lastActionId = (lobby.lastActionId || 0) + 1;
+        if (lobby.currentTurn >= lobby.totalTurns) lobby.status = 'finished';
+        // Check round gem bonus
+        awardLowestScoreGem(lobby);
+        startTurnTimer(lobby);
+        io.to(lobby.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+        io.to(lobby.code).emit('toast', { message: 'Time\'s up! Turn skipped.', type: 'error' });
+    }, lobby.settings.turnTime * 1000);
+}
+
+function clearTurnTimer(code) {
+    if (turnTimers[code]) { clearTimeout(turnTimers[code]); delete turnTimers[code]; }
+}
+
+// ===== Lowest-score gem bonus (called after each turn) =====
+function awardLowestScoreGem(lobby) {
+    if (lobby.status !== 'playing' || lobby.playerOrder.length < 2) return;
+    // Only award at end of a full round (every N turns where N = playerCount)
+    if (lobby.currentTurn === 0 || lobby.currentTurn % lobby.playerOrder.length !== 0) return;
+    let minScore = Infinity;
+    for (const pid of lobby.playerOrder) minScore = Math.min(minScore, lobby.players[pid].score);
+    for (const pid of lobby.playerOrder) {
+        if (lobby.players[pid].score === minScore) lobby.players[pid].gems = Math.min(15, lobby.players[pid].gems + 1);
+    }
+}
+
 // ===== Build lobby payload for clients =====
 function lobbyPayload(lobby) {
     return {
@@ -205,7 +246,9 @@ function lobbyPayload(lobby) {
         currentPlayerIndex: lobby.currentPlayerIndex || 0,
         currentTurn: lobby.currentTurn || 0,
         totalTurns: lobby.totalTurns || 0,
-        lastAction: lobby.lastAction || null
+        lastAction: lobby.lastAction || null,
+        lastActionId: lobby.lastActionId || 0,
+        turnDeadline: lobby.turnDeadline || null
     };
 }
 
@@ -256,12 +299,13 @@ io.on('connection', (socket) => {
         if (!session) return;
         session.playerName = name;
         const code = generateRoomCode();
+        const turnTime = Math.min(120, Math.max(0, settings.turnTime || 0));
         const lobby = {
             code, host: session.playerId, hostName: name, status: 'waiting',
-            settings: { maxPlayers: Math.min(6, Math.max(1, settings.maxPlayers || 4)), turnsPerPlayer: Math.min(20, Math.max(1, settings.turnsPerPlayer || 5)), startingGems: Math.min(15, Math.max(0, settings.startingGems || 5)) },
+            settings: { maxPlayers: Math.min(6, Math.max(1, settings.maxPlayers || 4)), turnsPerPlayer: Math.min(20, Math.max(1, settings.turnsPerPlayer || 5)), startingGems: Math.min(15, Math.max(0, settings.startingGems || 5)), turnTime },
             players: { [session.playerId]: { name, score: 0, gems: settings.startingGems || 5, wordsCount: 0, longestWord: '', connected: true } },
             playerOrder: [session.playerId],
-            board: null, currentPlayerIndex: 0, currentTurn: 0, totalTurns: 0, lastAction: null
+            board: null, currentPlayerIndex: 0, currentTurn: 0, totalTurns: 0, lastAction: null, lastActionId: 0, turnDeadline: null
         };
         lobbies[code] = lobby;
         session.lobbyCode = code;
@@ -321,6 +365,7 @@ io.on('connection', (socket) => {
         lobby.currentTurn = 0;
         lobby.totalTurns = lobby.settings.turnsPerPlayer * lobby.playerOrder.length;
         lobby.lastAction = null;
+        lobby.lastActionId = 0;
 
         for (const pid of lobby.playerOrder) {
             lobby.players[pid].score = 0;
@@ -330,6 +375,13 @@ io.on('connection', (socket) => {
         }
 
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+        startTurnTimer(lobby);
+    });
+
+    // ---------- LIVE TILE SELECTION ----------
+    socket.on('tileSelect', ({ tiles }) => {
+        if (!session || !session.lobbyCode) return;
+        socket.to(session.lobbyCode).emit('opponentSelection', { playerId: session.playerId, playerName: session.playerName, tiles: tiles || [] });
     });
 
     // ---------- SUBMIT WORD ----------
@@ -348,12 +400,20 @@ io.on('connection', (socket) => {
         const valid = await isValidWord(word);
         if (!valid) { socket.emit('wordResult', { valid: false, word }); return; }
 
+        clearTurnTimer(session.lobbyCode);
+
         const score = calculateScore(lobby.board, tiles);
         const player = lobby.players[session.playerId];
         player.score += score;
 
+        // Track consumed bonuses & gems for respawn
+        const usedBonuses = [];
         let usedDW = false;
-        for (const { row, col } of tiles) if (lobby.board[row][col].bonus === 'double-word') usedDW = true;
+        for (const { row, col } of tiles) {
+            const b = lobby.board[row][col].bonus;
+            if (b === 'double-letter' || b === 'triple-letter') usedBonuses.push(b);
+            if (b === 'double-word') { usedDW = true; usedBonuses.push(b); }
+        }
 
         let gc = 0;
         for (const { row, col } of tiles) if (lobby.board[row][col].hasGem) { gc++; lobby.board[row][col].hasGem = false; }
@@ -363,14 +423,18 @@ io.on('connection', (socket) => {
         if (word.length > player.longestWord.length) player.longestWord = word;
 
         refillUsedTiles(lobby.board, tiles);
-        shuffleLetterBonuses(lobby.board);
-        if (usedDW) addNewDoubleWordBonus(lobby.board);
+        respawnBonuses(lobby.board, usedBonuses, gc);
 
         lobby.currentPlayerIndex = (lobby.currentPlayerIndex + 1) % lobby.playerOrder.length;
         lobby.currentTurn++;
+        lobby.lastActionId = (lobby.lastActionId || 0) + 1;
         lobby.lastAction = { playerId: session.playerId, playerName: session.playerName, word, score };
 
-        if (lobby.currentTurn >= lobby.totalTurns) lobby.status = 'finished';
+        // Lowest-score gem bonus at end of each round
+        awardLowestScoreGem(lobby);
+
+        if (lobby.currentTurn >= lobby.totalTurns) { lobby.status = 'finished'; clearTurnTimer(session.lobbyCode); }
+        else startTurnTimer(lobby);
 
         socket.emit('wordResult', { valid: true, word, score });
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
@@ -489,10 +553,8 @@ function removePlayerFromGame(lobby, playerId) {
     }
 
     if (wasPlaying && lobby.playerOrder.length > 0) {
-        // Recalculate total turns based on remaining players
-        const turnsPlayed = lobby.currentTurn;
-        const remainingRounds = Math.max(1, lobby.settings.turnsPerPlayer - Math.floor(turnsPlayed / (lobby.playerOrder.length + 1)));
-        lobby.totalTurns = turnsPlayed + (remainingRounds * lobby.playerOrder.length);
+        // Fix: simply recalculate total turns for remaining player count
+        lobby.totalTurns = lobby.settings.turnsPerPlayer * lobby.playerOrder.length;
 
         // Adjust current player index
         if (leavingIdx >= 0) {
