@@ -374,8 +374,8 @@ io.on('connection', (socket) => {
             lobby.players[pid].longestWord = '';
         }
 
-        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
         startTurnTimer(lobby);
+        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
     });
 
     // ---------- LIVE TILE SELECTION ----------
