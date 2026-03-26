@@ -358,14 +358,6 @@ body {
     z-index: 1;
 }
 
-.tile.change-selected {
-    background: linear-gradient(145deg, #d946ef, #c026d3);
-    border-color: #f0abfc;
-    box-shadow: 0 0 20px rgba(217, 70, 239, 0.6);
-    transform: scale(1.05);
-    z-index: 1;
-}
-
 .tile.opponent-selected {
     border-color: #22d3ee;
     box-shadow: 0 0 12px rgba(34, 211, 238, 0.5);
@@ -1460,41 +1452,4 @@ body {
     .player-card .p-name { font-size: 10px; }
     .player-card { padding: 8px 6px; }
     .scoreboard { gap: 6px; }
-}
-
-/* ===== Letter Picker Modal ===== */
-.letter-picker-content {
-    max-width: 400px;
-    padding: 24px;
-    text-align: center;
-}
-
-.letter-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-    margin: 24px 0;
-}
-
-.letter-picker-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
-    color: var(--text-primary);
-    font-size: 20px;
-    font-weight: 700;
-    padding: 12px 0;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.letter-picker-btn:hover {
-    background: var(--accent-primary);
-    border-color: var(--accent-secondary);
-    transform: scale(1.05);
-}
-
-@media (max-width: 480px) {
-    .letter-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
-    .letter-picker-btn { padding: 10px 0; font-size: 18px; }
 }
