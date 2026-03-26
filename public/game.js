@@ -235,8 +235,8 @@ class WordFinderGame {
         this.menuEls.nicknameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.goToCreateLobby(); });
         this.createEls.backBtn.addEventListener('click', () => this.showScreen('mainMenu'));
         this.createEls.confirmBtn.addEventListener('click', () => this.createLobby());
-        this.createEls.maxPlayersDown.addEventListener('click', () => this.stepSetting('maxPlayers', -1, 1, 6));
-        this.createEls.maxPlayersUp.addEventListener('click', () => this.stepSetting('maxPlayers', 1, 1, 6));
+        this.createEls.maxPlayersDown.addEventListener('click', () => this.stepSetting('maxPlayers', -1, 1, 10));
+        this.createEls.maxPlayersUp.addEventListener('click', () => this.stepSetting('maxPlayers', 1, 1, 10));
         this.createEls.roundsDown.addEventListener('click', () => this.stepSetting('turnsPerPlayer', -1, 1, 20));
         this.createEls.roundsUp.addEventListener('click', () => this.stepSetting('turnsPerPlayer', 1, 1, 20));
         this.createEls.gemsDown.addEventListener('click', () => this.stepSetting('startingGems', -1, 0, 15));
