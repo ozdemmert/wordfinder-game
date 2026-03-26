@@ -248,7 +248,7 @@ function lobbyPayload(lobby) {
         totalTurns: lobby.totalTurns || 0,
         lastAction: lobby.lastAction || null,
         lastActionId: lobby.lastActionId || 0,
-        turnDeadline: lobby.turnDeadline || null
+        turnTimeRemaining: lobby.turnDeadline ? Math.max(0, (lobby.turnDeadline - Date.now()) / 1000) : null
     };
 }
 

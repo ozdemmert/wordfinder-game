@@ -192,11 +192,12 @@ class WordFinderGame {
             this.showToast(`${lobby.lastAction.playerName}: +${lobby.lastAction.score} pts (${lobby.lastAction.word})`, 'info');
         this.lastSeenActionId = lobby.lastActionId || 0;
 
-        // Update turn deadline for timer
-        this.turnDeadline = lobby.turnDeadline;
-        this.startTimerDisplay();
+        // Compute local deadline from server's remaining seconds (avoids clock sync issues)
+        this.turnDeadline = (lobby.turnTimeRemaining != null && lobby.turnTimeRemaining > 0) ? Date.now() + lobby.turnTimeRemaining * 1000 : null;
 
         this.clearSelection(); this.renderScoreboard(); this.renderBoard(); this.updateUI(); this.updateWordDisplay(); this.applyTurnState();
+        // Start timer AFTER updateUI so the #turn-timer span exists in DOM
+        this.startTimerDisplay();
     }
 
     applyTurnState() {
