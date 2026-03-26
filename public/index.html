@@ -155,9 +155,10 @@
             </button>
         </div>
         <div class="powerups">
-            <button class="powerup-btn" id="shuffle-btn" data-cost="3"><span class="powerup-icon">🔀</span><span class="powerup-name">Shuffle</span><span class="powerup-cost">💎 3</span></button>
-            <button class="powerup-btn" id="swap-btn" data-cost="2"><span class="powerup-icon">🔄</span><span class="powerup-name">Swap</span><span class="powerup-cost">💎 2</span></button>
-            <button class="powerup-btn" id="hint-btn" data-cost="1"><span class="powerup-icon">💡</span><span class="powerup-name">Hint</span><span class="powerup-cost">💎 1</span></button>
+            <button class="powerup-btn" id="shuffle-btn" data-cost="1"><span class="powerup-icon">🔀</span><span class="powerup-name">Shuffle</span><span class="powerup-cost">💎 1</span></button>
+            <button class="powerup-btn" id="swap-btn" data-cost="3"><span class="powerup-icon">🔄</span><span class="powerup-name">Swap</span><span class="powerup-cost">💎 3</span></button>
+            <button class="powerup-btn" id="hint-btn" data-cost="2"><span class="powerup-icon">💡</span><span class="powerup-name">Hint</span><span class="powerup-cost">💎 2</span></button>
+            <button class="powerup-btn" id="change-btn" data-cost="4"><span class="powerup-icon">✏️</span><span class="powerup-name">Change</span><span class="powerup-cost">💎 4</span></button>
         </div>
         <div class="legend">
             <div class="legend-title">Bonus Tiles</div>
@@ -182,6 +183,19 @@
     <div class="swap-indicator" id="swap-indicator">
         <span>Select tiles to swap</span>
         <button class="cancel-swap" id="cancel-swap">Cancel</button>
+    </div>
+
+    <div class="change-indicator" id="change-indicator">
+        <span>Select a tile to change</span>
+        <button class="cancel-change" id="cancel-change">Cancel</button>
+    </div>
+
+    <div class="letter-picker-overlay" id="letter-picker" style="display:none;">
+        <div class="letter-picker-content">
+            <h3>Pick a Letter</h3>
+            <div class="letter-grid" id="letter-grid"></div>
+            <button class="letter-picker-cancel" id="letter-picker-cancel">Cancel</button>
+        </div>
     </div>
 
     <div class="toast" id="toast">Message</div>

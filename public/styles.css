@@ -350,7 +350,7 @@ body {
     border-color: rgba(124, 58, 237, 0.5);
 }
 
-.tile.swap-selected {
+.tile.swap-selected, .tile.change-selected {
     background: linear-gradient(145deg, #0891b2, #0e7490);
     border-color: var(--gem-color);
     box-shadow: 0 0 20px rgba(6, 182, 212, 0.6);
@@ -814,6 +814,128 @@ body {
 }
 
 .cancel-swap:hover { background: rgba(0, 0, 0, 0.5); }
+
+/* ===== Change Indicator ===== */
+.change-indicator {
+    position: fixed;
+    bottom: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-primary);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-weight: 600;
+    transition: bottom 0.3s ease;
+    z-index: 50;
+    box-shadow: var(--shadow-md);
+    max-width: calc(100% - 40px);
+}
+
+.change-indicator.active { bottom: 30px; }
+
+.cancel-change {
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: none;
+    border-radius: 15px;
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.cancel-change:hover { background: rgba(0, 0, 0, 0.5); }
+
+/* ===== Letter Picker ===== */
+.letter-picker-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+}
+
+.letter-picker-content {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    padding: 30px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.letter-picker-content h3 {
+    margin-bottom: 20px;
+    font-size: 20px;
+    color: var(--text-primary);
+}
+
+.letter-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.letter-grid button {
+    aspect-ratio: 1;
+    background: var(--tile-bg);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.letter-grid button:hover {
+    border-color: var(--accent-secondary);
+    background: var(--tile-hover);
+    transform: scale(1.05);
+}
+
+.letter-grid button .letter-pts {
+    font-size: 9px;
+    opacity: 0.6;
+    font-weight: 500;
+}
+
+.letter-picker-cancel {
+    padding: 10px 24px;
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.letter-picker-cancel:hover {
+    background: var(--error);
+    color: white;
+}
 
 /* ===== Toast ===== */
 .toast {

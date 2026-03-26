@@ -43,12 +43,19 @@ const LETTERS = {
 // ===== Word Validation (Server-Side — no CORS issues) =====
 const wordCache = new Map();
 
+// Pre-populate cache with common valid 2-letter English words
+const COMMON_TWO_LETTER_WORDS = ['aa','ab','ad','ae','ag','ah','ai','al','am','an','ar','as','at','aw','ax','ay','ba','be','bi','bo','by','da','de','do','ed','ef','eh','el','em','en','er','es','et','ew','ex','fa','fe','go','ha','he','hi','hm','ho','id','if','in','is','it','jo','ka','ki','la','li','lo','ma','me','mi','mm','mo','mu','my','na','ne','no','nu','od','oe','of','oh','oi','ok','om','on','oo','op','or','os','ou','ow','ox','oy','pa','pe','pi','po','qi','re','sh','si','so','ta','ti','to','uh','um','un','up','us','ut','we','wo','xi','xu','ya','ye','yo','za'];
+for (const w of COMMON_TWO_LETTER_WORDS) wordCache.set(w, true);
+
 async function isValidWord(word) {
     if (!word || word.length < 2) return false;
     const lower = word.toLowerCase();
     if (wordCache.has(lower)) return wordCache.get(lower);
     try {
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${lower}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${lower}`, { signal: controller.signal });
+        clearTimeout(timeout);
         const valid = res.ok;
         wordCache.set(lower, valid);
         return valid;
@@ -66,19 +73,22 @@ function generateRoomCode() {
     return code;
 }
 
-function createLetterPool() {
-    const pool = [];
-    for (const [l, d] of Object.entries(LETTERS)) for (let i = 0; i < d.count; i++) pool.push(l);
-    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-    return pool;
+const TOTAL_LETTER_WEIGHT = Object.values(LETTERS).reduce((sum, d) => sum + d.count, 0);
+
+function weightedRandomLetter() {
+    let r = Math.random() * TOTAL_LETTER_WEIGHT;
+    for (const [letter, data] of Object.entries(LETTERS)) {
+        r -= data.count;
+        if (r <= 0) return letter;
+    }
+    return 'E';
 }
 
 function generateBoard() {
-    const board = [], pool = createLetterPool();
+    const board = [];
     const bonusPos = generateBonusPositions(), gemPos = generateGemPositions();
     for (let r = 0; r < 5; r++) { board[r] = []; for (let c = 0; c < 5; c++) {
-        const idx = Math.floor(Math.random() * pool.length);
-        const letter = pool.splice(idx, 1)[0];
+        const letter = weightedRandomLetter();
         const key = `${r}-${c}`;
         board[r][c] = { letter, points: LETTERS[letter].points, row: r, col: c, bonus: bonusPos[key] || null, hasGem: gemPos.has(key) };
     }} return board;
@@ -132,9 +142,8 @@ function calculateScore(board, tiles) {
 }
 
 function refillUsedTiles(board, tiles) {
-    const keys = Object.keys(LETTERS);
     for (const { row, col } of tiles) {
-        const nl = keys[Math.floor(Math.random() * keys.length)];
+        const nl = weightedRandomLetter();
         board[row][col].letter = nl;
         board[row][col].points = LETTERS[nl].points;
         board[row][col].hasGem = false;
@@ -201,7 +210,7 @@ function startTurnTimer(lobby) {
         lobby.lastActionId = (lobby.lastActionId || 0) + 1;
         if (lobby.currentTurn >= lobby.totalTurns) lobby.status = 'finished';
         // Check round gem bonus
-        awardLowestScoreGem(lobby);
+        awardPeriodicGems(lobby);
         startTurnTimer(lobby);
         io.to(lobby.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
         io.to(lobby.code).emit('toast', { message: 'Time\'s up! Turn skipped.', type: 'error' });
@@ -212,15 +221,12 @@ function clearTurnTimer(code) {
     if (turnTimers[code]) { clearTimeout(turnTimers[code]); delete turnTimers[code]; }
 }
 
-// ===== Lowest-score gem bonus (called after each turn) =====
-function awardLowestScoreGem(lobby) {
-    if (lobby.status !== 'playing' || lobby.playerOrder.length < 2) return;
-    // Only award at end of a full round (every N turns where N = playerCount)
-    if (lobby.currentTurn === 0 || lobby.currentTurn % lobby.playerOrder.length !== 0) return;
-    let minScore = Infinity;
-    for (const pid of lobby.playerOrder) minScore = Math.min(minScore, lobby.players[pid].score);
+// ===== Periodic gem bonus (every 2 turns, all players get +1 gem) =====
+function awardPeriodicGems(lobby) {
+    if (lobby.status !== 'playing') return;
+    if (lobby.currentTurn === 0 || lobby.currentTurn % 2 !== 0) return;
     for (const pid of lobby.playerOrder) {
-        if (lobby.players[pid].score === minScore) lobby.players[pid].gems = Math.min(15, lobby.players[pid].gems + 1);
+        lobby.players[pid].gems = Math.min(15, lobby.players[pid].gems + 1);
     }
 }
 
@@ -312,6 +318,7 @@ io.on('connection', (socket) => {
         socket.join(code);
         socket.emit('lobbyCreated', { code });
         socket.emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+        io.emit('lobbiesChanged');
     });
 
     // ---------- JOIN LOBBY ----------
@@ -332,6 +339,7 @@ io.on('connection', (socket) => {
         socket.join(code);
         io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
         socket.to(code).emit('toast', { message: `${name} joined`, type: 'info' });
+        io.emit('lobbiesChanged');
     });
 
     // ---------- GET LOBBIES ----------
@@ -376,6 +384,7 @@ io.on('connection', (socket) => {
 
         startTurnTimer(lobby);
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+        io.emit('lobbiesChanged');
     });
 
     // ---------- LIVE TILE SELECTION ----------
@@ -431,7 +440,7 @@ io.on('connection', (socket) => {
         lobby.lastAction = { playerId: session.playerId, playerName: session.playerName, word, score };
 
         // Lowest-score gem bonus at end of each round
-        awardLowestScoreGem(lobby);
+        awardPeriodicGems(lobby);
 
         if (lobby.currentTurn >= lobby.totalTurns) { lobby.status = 'finished'; clearTurnTimer(session.lobbyCode); }
         else startTurnTimer(lobby);
@@ -447,8 +456,8 @@ io.on('connection', (socket) => {
         if (!lobby || lobby.status !== 'playing') return;
         if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
         const player = lobby.players[session.playerId];
-        if (player.gems < 3) { socket.emit('error', { message: 'Not enough gems!' }); return; }
-        player.gems -= 3;
+        if (player.gems < 1) { socket.emit('error', { message: 'Not enough gems!' }); return; }
+        player.gems -= 1;
         shuffleBoardLetters(lobby.board);
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
         io.to(session.lobbyCode).emit('toast', { message: `${session.playerName} shuffled the board`, type: 'info' });
@@ -461,15 +470,33 @@ io.on('connection', (socket) => {
         if (!lobby || lobby.status !== 'playing') return;
         if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
         const player = lobby.players[session.playerId];
-        if (player.gems < 2) { socket.emit('error', { message: 'Not enough gems!' }); return; }
+        if (player.gems < 3) { socket.emit('error', { message: 'Not enough gems!' }); return; }
         if (!tile1 || !tile2 || tile1.row < 0 || tile1.row >= 5 || tile2.row < 0 || tile2.row >= 5) return;
 
-        player.gems -= 2;
+        player.gems -= 3;
         const a = lobby.board[tile1.row][tile1.col], b = lobby.board[tile2.row][tile2.col];
         const [tl, tp] = [a.letter, a.points];
         a.letter = b.letter; a.points = b.points;
         b.letter = tl; b.points = tp;
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+    });
+
+    // ---------- CHANGE (replace a tile's letter) ----------
+    socket.on('useChange', ({ row, col, newLetter }) => {
+        if (!session || !session.lobbyCode) return;
+        const lobby = lobbies[session.lobbyCode];
+        if (!lobby || lobby.status !== 'playing') return;
+        if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
+        const player = lobby.players[session.playerId];
+        if (player.gems < 4) { socket.emit('error', { message: 'Not enough gems!' }); return; }
+        if (row < 0 || row >= 5 || col < 0 || col >= 5) return;
+        const letter = (newLetter || '').toUpperCase();
+        if (!LETTERS[letter]) return;
+        player.gems -= 4;
+        lobby.board[row][col].letter = letter;
+        lobby.board[row][col].points = LETTERS[letter].points;
+        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+        io.to(session.lobbyCode).emit('toast', { message: `${session.playerName} changed a tile`, type: 'info' });
     });
 
     // ---------- HINT (2-letter words, shuffle until found) ----------
@@ -479,18 +506,23 @@ io.on('connection', (socket) => {
         if (!lobby || lobby.status !== 'playing') return;
         if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
         const player = lobby.players[session.playerId];
-        if (player.gems < 1) { socket.emit('error', { message: 'Not enough gems!' }); return; }
+        if (player.gems < 2) { socket.emit('error', { message: 'Not enough gems!' }); return; }
 
         let foundWord = null;
-        const MAX_ATTEMPTS = 20;
+        const MAX_ATTEMPTS = 5;
 
         for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
             const pairs = findTwoLetterPairs(lobby.board);
-            const results = await Promise.allSettled(
-                pairs.map(async w => ({ word: w, valid: await isValidWord(w) }))
-            );
-            for (const r of results) {
-                if (r.status === 'fulfilled' && r.value.valid) { foundWord = r.value.word; break; }
+            // Check cached words first (instant)
+            for (const w of pairs) {
+                if (wordCache.get(w.toLowerCase())) { foundWord = w; break; }
+            }
+            if (foundWord) break;
+            // Check uncached words sequentially with early exit
+            for (const w of pairs) {
+                if (wordCache.has(w.toLowerCase())) continue;
+                const valid = await isValidWord(w);
+                if (valid) { foundWord = w; break; }
             }
             if (foundWord) break;
             // Shuffle and try again
@@ -498,7 +530,7 @@ io.on('connection', (socket) => {
         }
 
         if (foundWord) {
-            player.gems -= 1;
+            player.gems -= 2;
             io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
             socket.emit('hintResult', { word: foundWord, found: true });
         } else {
@@ -594,6 +626,7 @@ function removePFromLobby(sess, socket) {
         io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
         io.to(code).emit('toast', { message: `${playerName} left the game`, type: 'error' });
     }
+    io.emit('lobbiesChanged');
 }
 
 function removePFromLobbyByPid(playerId, code) {
@@ -605,6 +638,7 @@ function removePFromLobbyByPid(playerId, code) {
     } else {
         io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
     }
+    io.emit('lobbiesChanged');
 }
 
 // ===== Health Check =====
