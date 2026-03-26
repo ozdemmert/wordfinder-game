@@ -28,6 +28,8 @@ class WordFinderGame {
         this.currentWord = '';
         this.isSwapMode = false;
         this.swapFirstTile = null;
+        this.isChangeMode = false;
+        this.changeTargetTile = null;
         this.lastSeenActionId = 0;
         this.timerInterval = null;
         this.turnDeadline = null;
@@ -44,8 +46,9 @@ class WordFinderGame {
         this.createEls = { backBtn: document.getElementById('back-from-create'), confirmBtn: document.getElementById('confirm-create-btn'), maxPlayersValue: document.getElementById('max-players-value'), maxPlayersDown: document.getElementById('max-players-down'), maxPlayersUp: document.getElementById('max-players-up'), roundsValue: document.getElementById('rounds-value'), roundsDown: document.getElementById('rounds-down'), roundsUp: document.getElementById('rounds-up'), gemsValue: document.getElementById('gems-value'), gemsDown: document.getElementById('gems-down'), gemsUp: document.getElementById('gems-up'), timerValue: document.getElementById('timer-value'), timerDown: document.getElementById('timer-down'), timerUp: document.getElementById('timer-up') };
         this.joinEls = { backBtn: document.getElementById('back-from-join'), codeInput: document.getElementById('room-code-input'), joinCodeBtn: document.getElementById('join-code-btn'), lobbyList: document.getElementById('lobby-list') };
         this.roomEls = { backBtn: document.getElementById('back-from-room'), codeDisplay: document.getElementById('room-code-display'), copyBtn: document.getElementById('copy-code-btn'), settingsInfo: document.getElementById('room-settings-info'), playerList: document.getElementById('room-players'), playerCount: document.getElementById('room-player-count'), startBtn: document.getElementById('room-start-btn') };
-        this.elements = { board: document.getElementById('game-board'), currentWord: document.getElementById('current-word'), wordScore: document.getElementById('word-score'), wordValidation: document.getElementById('word-validation'), scoreboard: document.getElementById('scoreboard'), turnIndicator: document.getElementById('turn-indicator'), submitBtn: document.getElementById('submit-btn'), clearBtn: document.getElementById('clear-btn'), shuffleBtn: document.getElementById('shuffle-btn'), swapBtn: document.getElementById('swap-btn'), hintBtn: document.getElementById('hint-btn'), modal: document.getElementById('game-over-modal'), rankingTable: document.getElementById('ranking-table'), playAgainBtn: document.getElementById('play-again-btn'), swapIndicator: document.getElementById('swap-indicator'), cancelSwap: document.getElementById('cancel-swap'), muteBtn: document.getElementById('mute-btn'), leaveGameBtn: document.getElementById('leave-game-btn'), toast: document.getElementById('toast') };
+        this.elements = { board: document.getElementById('game-board'), currentWord: document.getElementById('current-word'), wordScore: document.getElementById('word-score'), wordValidation: document.getElementById('word-validation'), scoreboard: document.getElementById('scoreboard'), turnIndicator: document.getElementById('turn-indicator'), submitBtn: document.getElementById('submit-btn'), clearBtn: document.getElementById('clear-btn'), shuffleBtn: document.getElementById('shuffle-btn'), swapBtn: document.getElementById('swap-btn'), hintBtn: document.getElementById('hint-btn'), changeBtn: document.getElementById('change-btn'), modal: document.getElementById('game-over-modal'), rankingTable: document.getElementById('ranking-table'), playAgainBtn: document.getElementById('play-again-btn'), swapIndicator: document.getElementById('swap-indicator'), cancelSwap: document.getElementById('cancel-swap'), changeIndicator: document.getElementById('change-indicator'), cancelChange: document.getElementById('cancel-change'), letterPickerModal: document.getElementById('letter-picker-modal'), letterGrid: document.getElementById('letter-grid'), cancelPickerBtn: document.getElementById('cancel-picker-btn'), muteBtn: document.getElementById('mute-btn'), leaveGameBtn: document.getElementById('leave-game-btn'), toast: document.getElementById('toast') };
 
+        this.initLetterPicker();
         this.bindEvents();
         this.setupSocket();
     }
@@ -114,10 +117,17 @@ class WordFinderGame {
 
         this.socket.on('disconnect', () => {
             this.showToast('Connection lost. Reconnecting...', 'error');
+            this.stopTimerDisplay();
         });
 
         this.socket.on('reconnect', () => {
             this.showToast('Reconnected!', 'success');
+        });
+
+        this.socket.on('lobbiesChanged', () => {
+            if (this.screens.joinLobby.style.display === 'flex') {
+                this.socket.emit('getLobbies');
+            }
         });
 
         // Opponent live tile selection
@@ -198,14 +208,19 @@ class WordFinderGame {
         this.clearSelection(); this.renderScoreboard(); this.renderBoard(); this.updateUI(); this.updateWordDisplay(); this.applyTurnState();
         // Start timer AFTER updateUI so the #turn-timer span exists in DOM
         this.startTimerDisplay();
+        this.applyTurnState();
+        // Start timer AFTER updateUI so the #turn-timer span exists in DOM
+        this.startTimerDisplay();
     }
 
     applyTurnState() {
         const tiles = this.elements.board.querySelectorAll('.tile');
         if (!this.isMyTurn) {
+            this.cancelSwapMode();
+            this.cancelChangeMode();
             tiles.forEach(t => t.classList.add('disabled'));
             this.elements.submitBtn.disabled = true; this.elements.clearBtn.disabled = true;
-            this.elements.shuffleBtn.disabled = true; this.elements.swapBtn.disabled = true; this.elements.hintBtn.disabled = true;
+            this.elements.shuffleBtn.disabled = true; this.elements.swapBtn.disabled = true; this.elements.hintBtn.disabled = true; this.elements.changeBtn.disabled = true;
         } else {
             tiles.forEach(t => t.classList.remove('disabled'));
             this.elements.clearBtn.disabled = false; this.updatePowerupButtons();
@@ -245,13 +260,16 @@ class WordFinderGame {
         this.elements.shuffleBtn.addEventListener('click', () => { window.soundManager.play('click'); this.socket.emit('useShuffle'); });
         this.elements.swapBtn.addEventListener('click', () => { window.soundManager.play('click'); this.startSwapMode(); });
         this.elements.hintBtn.addEventListener('click', () => { window.soundManager.play('click'); this.elements.hintBtn.disabled = true; this.showToast('Searching...', 'info'); this.socket.emit('useHint'); });
+        this.elements.changeBtn.addEventListener('click', () => { window.soundManager.play('click'); this.startChangeMode(); });
         this.elements.playAgainBtn.addEventListener('click', () => { window.soundManager.play('click'); this.backToMenu(); });
         this.elements.cancelSwap.addEventListener('click', () => { window.soundManager.play('click'); this.cancelSwapMode(); });
+        this.elements.cancelChange.addEventListener('click', () => { window.soundManager.play('click'); this.cancelChangeMode(); });
+        this.elements.cancelPickerBtn.addEventListener('click', () => { window.soundManager.play('click'); this.elements.letterPickerModal.classList.remove('active'); });
         this.elements.leaveGameBtn.addEventListener('click', () => { if (confirm('Are you sure you want to leave the game?')) { this.socket.emit('leaveGame'); this.currentLobbyCode = null; this.showScreen('mainMenu'); } });
         this.elements.muteBtn.addEventListener('click', () => { const m = window.soundManager.toggleMute(); this.elements.muteBtn.textContent = m ? '🔇' : '🔊'; });
         document.addEventListener('keydown', (e) => {
             if (this.screens.game.style.display === 'none') return;
-            if (e.key === 'Enter') this.submitWord(); else if (e.key === 'Escape') { if (this.isSwapMode) this.cancelSwapMode(); else this.clearSelection(); }
+            if (e.key === 'Enter') this.submitWord(); else if (e.key === 'Escape') { if (this.isSwapMode) this.cancelSwapMode(); else if (this.isChangeMode) this.cancelChangeMode(); else this.clearSelection(); }
         });
     }
 
@@ -337,6 +355,7 @@ class WordFinderGame {
         if (!this.isMyTurn) return;
         const tile = this.board[row][col];
         if (this.isSwapMode) { this.swapTile(row, col); return; }
+        if (this.isChangeMode) { this.openLetterPicker(row, col); return; }
         if (tile.selected) { const last = this.selectedTiles[this.selectedTiles.length - 1]; if (last && last.row === row && last.col === col) { window.soundManager.play('pop'); this.unselectTile(row, col); } return; }
         if (this.selectedTiles.length === 0 || this.isAdjacent(row, col)) { window.soundManager.play('pop'); this.selectTile(row, col); }
     }
@@ -404,7 +423,8 @@ class WordFinderGame {
     startSwapMode() {
         if (!this.isMyTurn) return;
         const myP = this.players.find(p => p.id === this.myPlayerId);
-        if (!myP || myP.gems < 2) { this.showToast('Not enough gems!', 'error'); return; }
+        if (!myP || myP.gems < 3) { this.showToast('Not enough gems!', 'error'); return; }
+        this.cancelChangeMode();
         this.isSwapMode = true; this.swapFirstTile = null; this.clearSelection();
         this.elements.swapIndicator.classList.add('active'); this.showToast('Select first tile', 'info');
     }
@@ -418,8 +438,52 @@ class WordFinderGame {
         else {
             if (this.swapFirstTile.row === row && this.swapFirstTile.col === col) { this.showToast('Pick a different tile!', 'error'); return; }
             this.socket.emit('useSwap', { tile1: this.swapFirstTile, tile2: { row, col } });
-            this.isSwapMode = false; this.swapFirstTile = null; this.elements.swapIndicator.classList.remove('active');
+            this.cancelSwapMode();
         }
+    }
+
+    // ===========================================================
+    //  CHANGE (💎4)
+    // ===========================================================
+    initLetterPicker() {
+        const grid = this.elements.letterGrid; grid.innerHTML = '';
+        for (let i = 65; i <= 90; i++) {
+            const letter = String.fromCharCode(i);
+            const btn = document.createElement('button');
+            btn.className = 'letter-picker-btn'; btn.textContent = letter;
+            btn.addEventListener('click', () => this.pickLetter(letter));
+            grid.appendChild(btn);
+        }
+    }
+
+    startChangeMode() {
+        if (!this.isMyTurn) return;
+        const myP = this.players.find(p => p.id === this.myPlayerId);
+        if (!myP || myP.gems < 4) { this.showToast('Not enough gems!', 'error'); return; }
+        this.cancelSwapMode();
+        this.isChangeMode = true; this.changeTargetTile = null; this.clearSelection();
+        this.elements.changeIndicator.classList.add('active'); this.showToast('Select a tile to change', 'info');
+    }
+
+    cancelChangeMode() {
+        this.isChangeMode = false; this.changeTargetTile = null;
+        this.elements.changeIndicator.classList.remove('active');
+        this.elements.letterPickerModal.classList.remove('active');
+        this.elements.board.querySelectorAll('.tile').forEach(t => t.classList.remove('change-selected'));
+    }
+
+    openLetterPicker(row, col) {
+        this.changeTargetTile = { row, col };
+        const el = this.elements.board.children[row * 5 + col];
+        this.elements.board.querySelectorAll('.tile').forEach(t => t.classList.remove('change-selected'));
+        el.classList.add('change-selected');
+        this.elements.letterPickerModal.classList.add('active');
+    }
+
+    pickLetter(newLetter) {
+        if (!this.isMyTurn || !this.changeTargetTile) return;
+        this.socket.emit('useChange', { row: this.changeTargetTile.row, col: this.changeTargetTile.col, newLetter });
+        this.cancelChangeMode();
     }
 
     // ===========================================================
@@ -486,10 +550,13 @@ class WordFinderGame {
     }
 
     updatePowerupButtons() {
-        if (!this.isMyTurn) { this.elements.shuffleBtn.disabled = true; this.elements.swapBtn.disabled = true; this.elements.hintBtn.disabled = true; return; }
+        if (!this.isMyTurn) { this.elements.shuffleBtn.disabled = true; this.elements.swapBtn.disabled = true; this.elements.hintBtn.disabled = true; this.elements.changeBtn.disabled = true; return; }
         const myP = this.players.find(p => p.id === this.myPlayerId);
         const gems = myP?.gems || 0;
-        this.elements.shuffleBtn.disabled = gems < 3; this.elements.swapBtn.disabled = gems < 2; this.elements.hintBtn.disabled = gems < 1;
+        this.elements.shuffleBtn.disabled = gems < 1;
+        this.elements.hintBtn.disabled = gems < 2;
+        this.elements.swapBtn.disabled = gems < 3;
+        this.elements.changeBtn.disabled = gems < 4;
     }
 
     // ===========================================================
