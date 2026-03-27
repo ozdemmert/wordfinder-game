@@ -192,7 +192,13 @@ class WordFinderGame {
         if (lobby.status === 'finished' || this.currentTurn >= this.totalTurns) {
             if (this.screens.game.style.display === 'none') this.showScreen('game');
             this.stopTimerDisplay();
-            this.renderScoreboard(); this.renderBoard(); this.updateUI(); this.endGame(); return;
+            this.renderScoreboard(); this.renderBoard(); this.updateUI();
+            // Only render ranking once — freeze it so leaving players don't disappear
+            if (!this.elements.modal.classList.contains('active')) {
+                this.finalPlayers = JSON.parse(JSON.stringify(this.players));
+                this.endGame();
+            }
+            return;
         }
         if (this.screens.game.style.display === 'none') this.showScreen('game');
 
@@ -553,7 +559,7 @@ class WordFinderGame {
     // ===========================================================
     endGame() {
         window.soundManager.play('win');
-        const ranking = [...this.players].sort((a, b) => b.score - a.score);
+        const ranking = [...(this.finalPlayers || this.players)].sort((a, b) => b.score - a.score);
         const table = this.elements.rankingTable; table.innerHTML = '';
         const medals = ['🥇', '🥈', '🥉', '4', '5', '6'];
         ranking.forEach((p, i) => {
