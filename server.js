@@ -17,6 +17,15 @@ const io = new Server(server, { cors: { origin: '*' } });
 const PORT = process.env.PORT || 3001;
 const RECONNECT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
+// ===== Crash Protection =====
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught Exception:', err.message, err.stack);
+    // Don't exit — keep the server running
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled Rejection:', reason);
+});
+
 // ===== State =====
 const lobbies = {};       // code -> lobby
 const sessions = {};      // token -> session
@@ -202,18 +211,20 @@ function startTurnTimer(lobby) {
     if (!lobby.settings.turnTime || lobby.settings.turnTime <= 0) return;
     lobby.turnDeadline = Date.now() + lobby.settings.turnTime * 1000;
     turnTimers[lobby.code] = setTimeout(() => {
-        if (!lobby || lobby.status !== 'playing') return;
-        // Auto-skip: advance turn without scoring
-        lobby.currentPlayerIndex = (lobby.currentPlayerIndex + 1) % lobby.playerOrder.length;
-        lobby.currentTurn++;
-        lobby.lastAction = null;
-        lobby.lastActionId = (lobby.lastActionId || 0) + 1;
-        if (lobby.currentTurn >= lobby.totalTurns) lobby.status = 'finished';
-        // Check round gem bonus
-        awardPeriodicGems(lobby);
-        startTurnTimer(lobby);
-        io.to(lobby.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-        io.to(lobby.code).emit('toast', { message: 'Time\'s up! Turn skipped.', type: 'error' });
+        try {
+            if (!lobby || !lobbies[lobby.code] || lobby.status !== 'playing') return;
+            lobby.currentPlayerIndex = (lobby.currentPlayerIndex + 1) % lobby.playerOrder.length;
+            lobby.currentTurn++;
+            lobby.lastAction = null;
+            lobby.lastActionId = (lobby.lastActionId || 0) + 1;
+            if (lobby.currentTurn >= lobby.totalTurns) { lobby.status = 'finished'; clearTurnTimer(lobby.code); }
+            awardPeriodicGems(lobby);
+            if (lobby.status === 'playing') startTurnTimer(lobby);
+            io.to(lobby.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+            io.to(lobby.code).emit('toast', { message: 'Time\'s up! Turn skipped.', type: 'error' });
+        } catch (err) {
+            console.error('[ERROR] Turn timer callback:', err.message);
+        }
     }, lobby.settings.turnTime * 1000);
 }
 
@@ -654,3 +665,8 @@ app.get('*', (req, res) => {
 server.listen(PORT, () => {
     console.log(`🎮 WordFinder server running on port ${PORT}`);
 });
+
+// Keep-alive: log server status periodically
+setInterval(() => {
+    console.log(`[HEARTBEAT] ${new Date().toISOString()} | Lobbies: ${Object.keys(lobbies).length} | Sessions: ${Object.keys(sessions).length}`);
+}, 5 * 60 * 1000);
