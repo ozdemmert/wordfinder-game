@@ -255,15 +255,12 @@ body {
 
 /* Score sağda; küçük ekranda taşmayı engellemek için genişlik sınırı */
 .word-score {
+    margin: 3px;
     font-size: 20px;
     font-weight: 700;
     color: var(--warning);
     opacity: 0;
     transition: opacity 0.3s ease;
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
     max-width: 40%;
     overflow: hidden;
     text-overflow: ellipsis;
