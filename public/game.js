@@ -1,9 +1,19 @@
 // ===== WordFinder – Socket.IO Client =====
 
-const LETTERS = {
+const LETTERS_EN = {
     'E': 1, 'A': 1, 'I': 1, 'O': 1, 'N': 1, 'R': 1, 'T': 1, 'L': 1, 'S': 1, 'U': 1,
     'D': 2, 'G': 2, 'B': 3, 'C': 3, 'M': 3, 'P': 3, 'F': 4, 'H': 4, 'V': 4, 'W': 4,
     'Y': 4, 'K': 5, 'J': 8, 'X': 8, 'Q': 10, 'Z': 10
+};
+
+const LETTERS_TR = {
+    'A': 1, 'E': 1, 'İ': 1, 'K': 1, 'L': 1, 'N': 1, 'R': 1, 'T': 1,
+    'I': 2, 'M': 2, 'O': 2, 'S': 2, 'U': 2,
+    'B': 3, 'D': 3, 'Ş': 3, 'Ü': 3, 'Y': 3,
+    'C': 4, 'Ç': 4, 'Z': 4,
+    'G': 5, 'H': 5, 'P': 5,
+    'F': 7, 'Ö': 7, 'V': 7,
+    'J': 10
 };
 
 class WordFinderGame {
@@ -14,7 +24,7 @@ class WordFinderGame {
         this.myName = '';
         this.currentLobbyCode = null;
         this.isHost = false;
-        this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0 };
+        this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0, language: 'en' };
 
         this.players = [];
         this.playerOrder = [];
@@ -43,7 +53,7 @@ class WordFinderGame {
             game: document.getElementById('game-screen'),
         };
         this.menuEls = { nicknameInput: document.getElementById('nickname-input'), createBtn: document.getElementById('create-lobby-btn'), joinBtn: document.getElementById('join-lobby-btn') };
-        this.createEls = { backBtn: document.getElementById('back-from-create'), confirmBtn: document.getElementById('confirm-create-btn'), maxPlayersValue: document.getElementById('max-players-value'), maxPlayersDown: document.getElementById('max-players-down'), maxPlayersUp: document.getElementById('max-players-up'), roundsValue: document.getElementById('rounds-value'), roundsDown: document.getElementById('rounds-down'), roundsUp: document.getElementById('rounds-up'), gemsValue: document.getElementById('gems-value'), gemsDown: document.getElementById('gems-down'), gemsUp: document.getElementById('gems-up'), timerValue: document.getElementById('timer-value'), timerDown: document.getElementById('timer-down'), timerUp: document.getElementById('timer-up') };
+        this.createEls = { backBtn: document.getElementById('back-from-create'), confirmBtn: document.getElementById('confirm-create-btn'), langEn: document.getElementById('lang-en'), langTr: document.getElementById('lang-tr'), maxPlayersValue: document.getElementById('max-players-value'), maxPlayersDown: document.getElementById('max-players-down'), maxPlayersUp: document.getElementById('max-players-up'), roundsValue: document.getElementById('rounds-value'), roundsDown: document.getElementById('rounds-down'), roundsUp: document.getElementById('rounds-up'), gemsValue: document.getElementById('gems-value'), gemsDown: document.getElementById('gems-down'), gemsUp: document.getElementById('gems-up'), timerValue: document.getElementById('timer-value'), timerDown: document.getElementById('timer-down'), timerUp: document.getElementById('timer-up') };
         this.joinEls = { backBtn: document.getElementById('back-from-join'), codeInput: document.getElementById('room-code-input'), joinCodeBtn: document.getElementById('join-code-btn'), lobbyList: document.getElementById('lobby-list') };
         this.roomEls = { backBtn: document.getElementById('back-from-room'), codeDisplay: document.getElementById('room-code-display'), copyBtn: document.getElementById('copy-code-btn'), settingsInfo: document.getElementById('room-settings-info'), playerList: document.getElementById('room-players'), playerCount: document.getElementById('room-player-count'), startBtn: document.getElementById('room-start-btn') };
         this.elements = { board: document.getElementById('game-board'), currentWord: document.getElementById('current-word'), wordScore: document.getElementById('word-score'), wordValidation: document.getElementById('word-validation'), scoreboard: document.getElementById('scoreboard'), turnIndicator: document.getElementById('turn-indicator'), submitBtn: document.getElementById('submit-btn'), clearBtn: document.getElementById('clear-btn'), shuffleBtn: document.getElementById('shuffle-btn'), swapBtn: document.getElementById('swap-btn'), hintBtn: document.getElementById('hint-btn'), changeBtn: document.getElementById('change-btn'), modal: document.getElementById('game-over-modal'), rankingTable: document.getElementById('ranking-table'), playAgainBtn: document.getElementById('play-again-btn'), swapIndicator: document.getElementById('swap-indicator'), cancelSwap: document.getElementById('cancel-swap'), changeIndicator: document.getElementById('change-indicator'), cancelChange: document.getElementById('cancel-change'), letterPicker: document.getElementById('letter-picker'), letterGrid: document.getElementById('letter-grid'), letterPickerCancel: document.getElementById('letter-picker-cancel'), muteBtn: document.getElementById('mute-btn'), leaveGameBtn: document.getElementById('leave-game-btn'), toast: document.getElementById('toast') };
@@ -161,7 +171,8 @@ class WordFinderGame {
 
     renderRoom(lobby) {
         const timerText = lobby.settings.turnTime > 0 ? ` · ⏱ ${lobby.settings.turnTime}s` : '';
-        this.roomEls.settingsInfo.textContent = `${lobby.settings.maxPlayers} players · ${lobby.settings.turnsPerPlayer} rounds · 💎 ${lobby.settings.startingGems} gems${timerText}`;
+        const langText = lobby.settings.language === 'tr' ? '🇹🇷 Türkçe' : '🇬🇧 English';
+        this.roomEls.settingsInfo.textContent = `${langText} · ${lobby.settings.maxPlayers} players · ${lobby.settings.turnsPerPlayer} rounds · 💎 ${lobby.settings.startingGems} gems${timerText}`;
         const list = this.roomEls.playerList; list.innerHTML = '';
         lobby.players.forEach((p, i) => {
             const card = document.createElement('div');
@@ -241,6 +252,8 @@ class WordFinderGame {
         this.menuEls.nicknameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.goToCreateLobby(); });
         this.createEls.backBtn.addEventListener('click', () => this.showScreen('mainMenu'));
         this.createEls.confirmBtn.addEventListener('click', () => this.createLobby());
+        this.createEls.langEn.addEventListener('click', () => this.setLanguage('en'));
+        this.createEls.langTr.addEventListener('click', () => this.setLanguage('tr'));
         this.createEls.maxPlayersDown.addEventListener('click', () => this.stepSetting('maxPlayers', -1, 1, 10));
         this.createEls.maxPlayersUp.addEventListener('click', () => this.stepSetting('maxPlayers', 1, 1, 10));
         this.createEls.roundsDown.addEventListener('click', () => this.stepSetting('turnsPerPlayer', -1, 1, 20));
@@ -283,7 +296,7 @@ class WordFinderGame {
 
     goToCreateLobby() {
         const name = this.validateNickname(); if (!name) return;
-        this.myName = name; this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0 };
+        this.myName = name; this.lobbySettings = { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0, language: 'en' };
         this.updateSettingsDisplay(); this.showScreen('createLobby');
     }
 
@@ -299,7 +312,9 @@ class WordFinderGame {
     // ===========================================================
     stepSetting(key, delta, min, max) { this.lobbySettings[key] = Math.max(min, Math.min(max, this.lobbySettings[key] + delta)); this.updateSettingsDisplay(); }
     stepTimerSetting(delta) { this.lobbySettings.turnTime = Math.max(0, Math.min(120, this.lobbySettings.turnTime + delta)); this.updateSettingsDisplay(); }
-    updateSettingsDisplay() { this.createEls.maxPlayersValue.textContent = this.lobbySettings.maxPlayers; this.createEls.roundsValue.textContent = this.lobbySettings.turnsPerPlayer; this.createEls.gemsValue.textContent = this.lobbySettings.startingGems; this.createEls.timerValue.textContent = this.lobbySettings.turnTime > 0 ? `${this.lobbySettings.turnTime}s` : 'Off'; }
+    setLanguage(lang) { this.lobbySettings.language = lang; this.createEls.langEn.classList.toggle('active', lang === 'en'); this.createEls.langTr.classList.toggle('active', lang === 'tr'); }
+    getLetters() { return this.lobbySettings.language === 'tr' ? LETTERS_TR : LETTERS_EN; }
+    updateSettingsDisplay() { this.createEls.maxPlayersValue.textContent = this.lobbySettings.maxPlayers; this.createEls.roundsValue.textContent = this.lobbySettings.turnsPerPlayer; this.createEls.gemsValue.textContent = this.lobbySettings.startingGems; this.createEls.timerValue.textContent = this.lobbySettings.turnTime > 0 ? `${this.lobbySettings.turnTime}s` : 'Off'; this.createEls.langEn.classList.toggle('active', this.lobbySettings.language === 'en'); this.createEls.langTr.classList.toggle('active', this.lobbySettings.language === 'tr'); }
 
     createLobby() { this.socket.emit('createLobby', { name: this.myName, settings: this.lobbySettings }); }
 
@@ -314,7 +329,8 @@ class WordFinderGame {
         if (lobbies.length === 0) { list.innerHTML = '<div class="empty-lobbies">No open lobbies found</div>'; return; }
         lobbies.forEach(l => {
             const card = document.createElement('div'); card.className = 'lobby-list-card';
-            card.innerHTML = `<div class="lobby-list-info"><span class="lobby-list-host">${l.hostName}'s Lobby</span><span class="lobby-list-meta">${l.playerCount}/${l.maxPlayers} players · ${l.turnsPerPlayer} rounds</span></div><span class="lobby-list-code">${l.code}</span>`;
+            const langFlag = l.language === 'tr' ? '🇹🇷' : '🇬🇧';
+            card.innerHTML = `<div class="lobby-list-info"><span class="lobby-list-host">${l.hostName}'s Lobby</span><span class="lobby-list-meta">${langFlag} ${l.playerCount}/${l.maxPlayers} players · ${l.turnsPerPlayer} rounds</span></div><span class="lobby-list-code">${l.code}</span>`;
             card.addEventListener('click', () => { this.socket.emit('joinLobby', { name: this.myName, code: l.code }); });
             list.appendChild(card);
         });
@@ -468,7 +484,8 @@ class WordFinderGame {
 
         const grid = this.elements.letterGrid;
         grid.innerHTML = '';
-        for (const [letter, points] of Object.entries(LETTERS)) {
+        const letters = this.getLetters();
+        for (const [letter, points] of Object.entries(letters)) {
             const btn = document.createElement('button');
             btn.innerHTML = `${letter}<span class="letter-pts">${points}</span>`;
             btn.addEventListener('click', () => this.selectChangeLetter(letter));

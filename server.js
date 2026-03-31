@@ -32,8 +32,8 @@ const sessions = {};      // token -> session
 const socketMap = {};     // socketId -> token
 const turnTimers = {};    // lobbyCode -> timeout handle
 
-// ===== Letter Distribution (English Scrabble) =====
-const LETTERS = {
+// ===== Letter Distributions =====
+const LETTERS_EN = {
     'E': { count: 12, points: 1 }, 'A': { count: 9, points: 1 },
     'I': { count: 9, points: 1 },  'O': { count: 8, points: 1 },
     'N': { count: 6, points: 1 },  'R': { count: 6, points: 1 },
@@ -49,24 +49,65 @@ const LETTERS = {
     'Q': { count: 1, points: 10 }, 'Z': { count: 1, points: 10 }
 };
 
+const LETTERS_TR = {
+    'A': { count: 12, points: 1 }, 'E': { count: 8, points: 1 },
+    'İ': { count: 7, points: 1 },  'K': { count: 7, points: 1 },
+    'L': { count: 7, points: 1 },  'N': { count: 7, points: 1 },
+    'R': { count: 6, points: 1 },  'T': { count: 5, points: 1 },
+    'I': { count: 4, points: 2 },  'M': { count: 4, points: 2 },
+    'O': { count: 3, points: 2 },  'S': { count: 3, points: 2 },
+    'U': { count: 3, points: 2 },
+    'B': { count: 2, points: 3 },  'D': { count: 4, points: 3 },
+    'Ş': { count: 3, points: 3 },  'Ü': { count: 3, points: 3 },
+    'Y': { count: 3, points: 3 },
+    'C': { count: 2, points: 4 },  'Ç': { count: 2, points: 4 },
+    'Z': { count: 2, points: 4 },
+    'G': { count: 2, points: 5 },  'H': { count: 1, points: 5 },
+    'P': { count: 1, points: 5 },
+    'F': { count: 1, points: 7 },  'Ö': { count: 1, points: 7 },
+    'V': { count: 1, points: 7 },
+    'J': { count: 1, points: 10 }
+};
+
+const LETTERS_BY_LANG = { en: LETTERS_EN, tr: LETTERS_TR };
+function getLetters(lang) { return LETTERS_BY_LANG[lang] || LETTERS_EN; }
+
 // ===== Word Validation (Server-Side — no CORS issues) =====
 const wordCache = new Map();
 
 // Pre-populate cache with common valid 2-letter English words
-const COMMON_TWO_LETTER_WORDS = ['aa','ab','ad','ae','ag','ah','ai','al','am','an','ar','as','at','aw','ax','ay','ba','be','bi','bo','by','da','de','do','ed','ef','eh','el','em','en','er','es','et','ew','ex','fa','fe','go','ha','he','hi','hm','ho','id','if','in','is','it','jo','ka','ki','la','li','lo','ma','me','mi','mm','mo','mu','my','na','ne','no','nu','od','oe','of','oh','oi','ok','om','on','oo','op','or','os','ou','ow','ox','oy','pa','pe','pi','po','qi','re','sh','si','so','ta','ti','to','uh','um','un','up','us','ut','we','wo','xi','xu','ya','ye','yo','za'];
-for (const w of COMMON_TWO_LETTER_WORDS) wordCache.set(w, true);
+const COMMON_TWO_LETTER_WORDS_EN = ['aa','ab','ad','ae','ag','ah','ai','al','am','an','ar','as','at','aw','ax','ay','ba','be','bi','bo','by','da','de','do','ed','ef','eh','el','em','en','er','es','et','ew','ex','fa','fe','go','ha','he','hi','hm','ho','id','if','in','is','it','jo','ka','ki','la','li','lo','ma','me','mi','mm','mo','mu','my','na','ne','no','nu','od','oe','of','oh','oi','ok','om','on','oo','op','or','os','ou','ow','ox','oy','pa','pe','pi','po','qi','re','sh','si','so','ta','ti','to','uh','um','un','up','us','ut','we','wo','xi','xu','ya','ye','yo','za'];
+for (const w of COMMON_TWO_LETTER_WORDS_EN) wordCache.set(`en:${w}`, true);
 
-async function isValidWord(word) {
+// Pre-populate cache with common valid 2-letter Turkish words
+const COMMON_TWO_LETTER_WORDS_TR = ['ab','ac','ad','af','ah','ak','al','am','an','ar','as','aş','at','av','ay','az','bu','da','de','el','en','er','es','et','ev','ey','ha','he','iç','il','im','in','ip','ir','is','iş','it','iz','ki','ne','of','oh','ok','ol','on','op','ot','öç','öd','öf','ön','öz','su','şu','ta','üç','üs','üz','ya','ye'];
+for (const w of COMMON_TWO_LETTER_WORDS_TR) wordCache.set(`tr:${w}`, true);
+
+async function isValidWord(word, language = 'en') {
     if (!word || word.length < 2) return false;
     const lower = word.toLowerCase();
-    if (wordCache.has(lower)) return wordCache.get(lower);
+    const key = `${language}:${lower}`;
+    if (wordCache.has(key)) return wordCache.get(key);
     try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${lower}`, { signal: controller.signal });
+        let url;
+        if (language === 'tr') {
+            url = `https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lower)}`;
+        } else {
+            url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(lower)}`;
+        }
+        const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeout);
-        const valid = res.ok;
-        wordCache.set(lower, valid);
+        let valid;
+        if (language === 'tr') {
+            // TDK returns an array of entries when valid, or {"error":"..."} when not
+            const data = await res.json();
+            valid = Array.isArray(data) && data.length > 0;
+        } else {
+            valid = res.ok;
+        }
+        wordCache.set(key, valid);
         return valid;
     } catch { return false; }
 }
@@ -82,24 +123,28 @@ function generateRoomCode() {
     return code;
 }
 
-const TOTAL_LETTER_WEIGHT = Object.values(LETTERS).reduce((sum, d) => sum + d.count, 0);
+const TOTAL_WEIGHT_EN = Object.values(LETTERS_EN).reduce((sum, d) => sum + d.count, 0);
+const TOTAL_WEIGHT_TR = Object.values(LETTERS_TR).reduce((sum, d) => sum + d.count, 0);
 
-function weightedRandomLetter() {
-    let r = Math.random() * TOTAL_LETTER_WEIGHT;
-    for (const [letter, data] of Object.entries(LETTERS)) {
+function weightedRandomLetter(lang = 'en') {
+    const letters = getLetters(lang);
+    const totalWeight = lang === 'tr' ? TOTAL_WEIGHT_TR : TOTAL_WEIGHT_EN;
+    let r = Math.random() * totalWeight;
+    for (const [letter, data] of Object.entries(letters)) {
         r -= data.count;
         if (r <= 0) return letter;
     }
-    return 'E';
+    return lang === 'tr' ? 'A' : 'E';
 }
 
-function generateBoard() {
+function generateBoard(lang = 'en') {
     const board = [];
+    const letters = getLetters(lang);
     const bonusPos = generateBonusPositions(), gemPos = generateGemPositions();
     for (let r = 0; r < 5; r++) { board[r] = []; for (let c = 0; c < 5; c++) {
-        const letter = weightedRandomLetter();
+        const letter = weightedRandomLetter(lang);
         const key = `${r}-${c}`;
-        board[r][c] = { letter, points: LETTERS[letter].points, row: r, col: c, bonus: bonusPos[key] || null, hasGem: gemPos.has(key) };
+        board[r][c] = { letter, points: letters[letter].points, row: r, col: c, bonus: bonusPos[key] || null, hasGem: gemPos.has(key) };
     }} return board;
 }
 
@@ -150,11 +195,12 @@ function calculateScore(board, tiles) {
     return score;
 }
 
-function refillUsedTiles(board, tiles) {
+function refillUsedTiles(board, tiles, lang = 'en') {
+    const letters = getLetters(lang);
     for (const { row, col } of tiles) {
-        const nl = weightedRandomLetter();
+        const nl = weightedRandomLetter(lang);
         board[row][col].letter = nl;
-        board[row][col].points = LETTERS[nl].points;
+        board[row][col].points = letters[nl].points;
         board[row][col].hasGem = false;
         board[row][col].bonus = null;
     }
@@ -181,13 +227,14 @@ function respawnBonuses(board, usedBonuses, usedGemCount) {
 
 
 
-function shuffleBoardLetters(board) {
-    const letters = [];
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) letters.push(board[r][c].letter);
-    for (let i = letters.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [letters[i], letters[j]] = [letters[j], letters[i]]; }
+function shuffleBoardLetters(board, lang = 'en') {
+    const ltrs = [];
+    const letterTable = getLetters(lang);
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) ltrs.push(board[r][c].letter);
+    for (let i = ltrs.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ltrs[i], ltrs[j]] = [ltrs[j], ltrs[i]]; }
     let idx = 0;
     for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-        board[r][c].letter = letters[idx]; board[r][c].points = LETTERS[letters[idx]].points; idx++;
+        board[r][c].letter = ltrs[idx]; board[r][c].points = letterTable[ltrs[idx]].points; idx++;
     }
 }
 
@@ -317,9 +364,10 @@ io.on('connection', (socket) => {
         session.playerName = name;
         const code = generateRoomCode();
         const turnTime = Math.min(120, Math.max(0, settings.turnTime || 0));
+        const language = settings.language === 'tr' ? 'tr' : 'en';
         const lobby = {
             code, host: session.playerId, hostName: name, status: 'waiting',
-            settings: { maxPlayers: Math.min(6, Math.max(1, settings.maxPlayers || 4)), turnsPerPlayer: Math.min(20, Math.max(1, settings.turnsPerPlayer || 5)), startingGems: Math.min(15, Math.max(0, settings.startingGems || 5)), turnTime },
+            settings: { maxPlayers: Math.min(6, Math.max(1, settings.maxPlayers || 4)), turnsPerPlayer: Math.min(20, Math.max(1, settings.turnsPerPlayer || 5)), startingGems: Math.min(15, Math.max(0, settings.startingGems || 5)), turnTime, language },
             players: { [session.playerId]: { name, score: 0, gems: settings.startingGems || 5, wordsCount: 0, longestWord: '', connected: true } },
             playerOrder: [session.playerId],
             board: null, currentPlayerIndex: 0, currentTurn: 0, totalTurns: 0, lastAction: null, lastActionId: 0, turnDeadline: null
@@ -357,7 +405,7 @@ io.on('connection', (socket) => {
     socket.on('getLobbies', () => {
         const list = Object.values(lobbies)
             .filter(l => l.status === 'waiting')
-            .map(l => ({ code: l.code, hostName: l.hostName, playerCount: l.playerOrder.length, maxPlayers: l.settings.maxPlayers, turnsPerPlayer: l.settings.turnsPerPlayer }));
+            .map(l => ({ code: l.code, hostName: l.hostName, playerCount: l.playerOrder.length, maxPlayers: l.settings.maxPlayers, turnsPerPlayer: l.settings.turnsPerPlayer, language: l.settings.language }));
         socket.emit('lobbiesList', { lobbies: list });
     });
 
@@ -378,7 +426,7 @@ io.on('connection', (socket) => {
         const lobby = lobbies[session.lobbyCode];
         if (!lobby || lobby.host !== session.playerId || lobby.status !== 'waiting') return;
 
-        lobby.board = generateBoard();
+        lobby.board = generateBoard(lobby.settings.language);
         lobby.status = 'playing';
         lobby.currentPlayerIndex = 0;
         lobby.currentTurn = 0;
@@ -417,7 +465,8 @@ io.on('connection', (socket) => {
         const word = tiles.map(t => lobby.board[t.row][t.col].letter).join('');
         if (word.length < 2) { socket.emit('error', { message: 'Word too short!' }); return; }
 
-        const valid = await isValidWord(word);
+        const lang = lobby.settings.language || 'en';
+        const valid = await isValidWord(word, lang);
         if (!valid) { socket.emit('wordResult', { valid: false, word }); return; }
 
         clearTurnTimer(session.lobbyCode);
@@ -442,7 +491,7 @@ io.on('connection', (socket) => {
         player.wordsCount++;
         if (word.length > player.longestWord.length) player.longestWord = word;
 
-        refillUsedTiles(lobby.board, tiles);
+        refillUsedTiles(lobby.board, tiles, lang);
         respawnBonuses(lobby.board, usedBonuses, gc);
 
         lobby.currentPlayerIndex = (lobby.currentPlayerIndex + 1) % lobby.playerOrder.length;
@@ -469,7 +518,7 @@ io.on('connection', (socket) => {
         const player = lobby.players[session.playerId];
         if (player.gems < 1) { socket.emit('error', { message: 'Not enough gems!' }); return; }
         player.gems -= 1;
-        shuffleBoardLetters(lobby.board);
+        shuffleBoardLetters(lobby.board, lobby.settings.language);
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
         io.to(session.lobbyCode).emit('toast', { message: `${session.playerName} shuffled the board`, type: 'info' });
     });
@@ -502,10 +551,11 @@ io.on('connection', (socket) => {
         if (player.gems < 4) { socket.emit('error', { message: 'Not enough gems!' }); return; }
         if (row < 0 || row >= 5 || col < 0 || col >= 5) return;
         const letter = (newLetter || '').toUpperCase();
-        if (!LETTERS[letter]) return;
+        const letterTable = getLetters(lobby.settings.language);
+        if (!letterTable[letter]) return;
         player.gems -= 4;
         lobby.board[row][col].letter = letter;
-        lobby.board[row][col].points = LETTERS[letter].points;
+        lobby.board[row][col].points = letterTable[letter].points;
         io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
         io.to(session.lobbyCode).emit('toast', { message: `${session.playerName} changed a tile`, type: 'info' });
     });
@@ -521,23 +571,24 @@ io.on('connection', (socket) => {
 
         let foundWord = null;
         const MAX_ATTEMPTS = 5;
+        const lang = lobby.settings.language || 'en';
 
         for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
             const pairs = findTwoLetterPairs(lobby.board);
             // Check cached words first (instant)
             for (const w of pairs) {
-                if (wordCache.get(w.toLowerCase())) { foundWord = w; break; }
+                if (wordCache.get(`${lang}:${w.toLowerCase()}`)) { foundWord = w; break; }
             }
             if (foundWord) break;
             // Check uncached words sequentially with early exit
             for (const w of pairs) {
-                if (wordCache.has(w.toLowerCase())) continue;
-                const valid = await isValidWord(w);
+                if (wordCache.has(`${lang}:${w.toLowerCase()}`)) continue;
+                const valid = await isValidWord(w, lang);
                 if (valid) { foundWord = w; break; }
             }
             if (foundWord) break;
             // Shuffle and try again
-            shuffleBoardLetters(lobby.board);
+            shuffleBoardLetters(lobby.board, lang);
         }
 
         if (foundWord) {

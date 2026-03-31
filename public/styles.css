@@ -1197,6 +1197,34 @@ body {
     text-align: center;
 }
 
+.language-toggle {
+    gap: 6px;
+}
+
+.lang-btn {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: 2px solid var(--bg-tertiary);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lang-btn:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.lang-btn.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-secondary);
+    color: var(--text-primary);
+}
+
 /* ===== Join Lobby ===== */
 .join-form {
     background: var(--bg-secondary);
