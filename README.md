@@ -13,7 +13,7 @@ A browser-based multiplayer word game. Connect letters, form words, and compete 
 7. The player with the highest score after all rounds wins! 🏆
 
 ## ✨ Features
-
+- **Turkish Language Support** — Added Turkish language support with Turkish word validation
 - **1–10 Players** — real-time multiplayer via WebSocket (Socket.IO)
 - **Turn-based gameplay** with per-player gem pools and a customizable **Turn Timer**
 - **Power-up System** — Shuffle, Hint, Swap, and Change tile
