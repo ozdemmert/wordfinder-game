@@ -93,7 +93,7 @@ async function isValidWord(word, language = 'en') {
         const timeout = setTimeout(() => controller.abort(), 4000);
         let url;
         if (language === 'tr') {
-            url = `https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lower)}`;
+            url = `https://freedictionaryapi.com/api/v1/entries/tr/${encodeURIComponent(lower)}`;
         } else {
             url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(lower)}`;
         }
@@ -101,9 +101,9 @@ async function isValidWord(word, language = 'en') {
         clearTimeout(timeout);
         let valid;
         if (language === 'tr') {
-            // TDK returns an array of entries when valid, or {"error":"..."} when not
+            // freedictionaryapi.com (v1) returns {"entries": []} for invalid words
             const data = await res.json();
-            valid = Array.isArray(data) && data.length > 0;
+            valid = data && Array.isArray(data.entries) && data.entries.length > 0;
         } else {
             valid = res.ok;
         }
