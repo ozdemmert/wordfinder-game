@@ -171,7 +171,7 @@ class WordFinderGame {
 
     renderRoom(lobby) {
         const timerText = lobby.settings.turnTime > 0 ? ` · ⏱ ${lobby.settings.turnTime}s` : '';
-        const langText = lobby.settings.language === 'tr' ? '🇹🇷 Türkçe' : '🇬🇧 English';
+        const langText = lobby.settings.language === 'tr' ? 'Türkçe' : 'English';
         this.roomEls.settingsInfo.textContent = `${langText} · ${lobby.settings.maxPlayers} players · ${lobby.settings.turnsPerPlayer} rounds · 💎 ${lobby.settings.startingGems} gems${timerText}`;
         const list = this.roomEls.playerList; list.innerHTML = '';
         lobby.players.forEach((p, i) => {
