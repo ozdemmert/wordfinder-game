@@ -93,7 +93,7 @@ async function isValidWord(word, language = 'en') {
         const timeout = setTimeout(() => controller.abort(), 4000);
         let url;
         if (language === 'tr') {
-            url = `https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lower)}`;
+            url = `https://tr.wiktionary.org/w/api.php?action=query&format=json&titles=${encodeURIComponent(lower)}&origin=*`;
         } else {
             url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(lower)}`;
         }
@@ -279,10 +279,9 @@ function clearTurnTimer(code) {
     if (turnTimers[code]) { clearTimeout(turnTimers[code]); delete turnTimers[code]; }
 }
 
-// ===== Periodic gem bonus (every 2 turns, all players get +1 gem) =====
+// ===== Periodic gem bonus (every turn, all players get +1 gem) =====
 function awardPeriodicGems(lobby) {
     if (lobby.status !== 'playing') return;
-    if (lobby.currentTurn === 0 || lobby.currentTurn % 2 !== 0) return;
     for (const pid of lobby.playerOrder) {
         lobby.players[pid].gems = Math.min(15, lobby.players[pid].gems + 1);
     }
