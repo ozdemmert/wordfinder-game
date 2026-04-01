@@ -93,7 +93,7 @@ async function isValidWord(word, language = 'en') {
         const timeout = setTimeout(() => controller.abort(), 4000);
         let url;
         if (language === 'tr') {
-            url = `https://tr.wiktionary.org/w/api.php?action=query&format=json&titles=${encodeURIComponent(lower)}&origin=*`;
+            url = `https://sozluk.gov.tr/gts?ara=${encodeURIComponent(lower)}`;
         } else {
             url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(lower)}`;
         }
