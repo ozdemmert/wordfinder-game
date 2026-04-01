@@ -85,7 +85,7 @@ for (const w of COMMON_TWO_LETTER_WORDS_TR) wordCache.set(`tr:${w}`, true);
 
 async function isValidWord(word, language = 'en') {
     if (!word || word.length < 2) return false;
-    const lower = word.toLowerCase();
+    const lower = language === 'tr' ? word.toLocaleLowerCase('tr-TR') : word.toLowerCase();
     const key = `${language}:${lower}`;
     if (wordCache.has(key)) return wordCache.get(key);
     try {
@@ -576,12 +576,14 @@ io.on('connection', (socket) => {
             const pairs = findTwoLetterPairs(lobby.board);
             // Check cached words first (instant)
             for (const w of pairs) {
-                if (wordCache.get(`${lang}:${w.toLowerCase()}`)) { foundWord = w; break; }
+                const lowerW = lang === 'tr' ? w.toLocaleLowerCase('tr-TR') : w.toLowerCase();
+                if (wordCache.get(`${lang}:${lowerW}`)) { foundWord = w; break; }
             }
             if (foundWord) break;
             // Check uncached words sequentially with early exit
             for (const w of pairs) {
-                if (wordCache.has(`${lang}:${w.toLowerCase()}`)) continue;
+                const lowerW = lang === 'tr' ? w.toLocaleLowerCase('tr-TR') : w.toLowerCase();
+                if (wordCache.has(`${lang}:${lowerW}`)) continue;
                 const valid = await isValidWord(w, lang);
                 if (valid) { foundWord = w; break; }
             }
