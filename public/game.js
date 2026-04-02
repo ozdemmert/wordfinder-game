@@ -362,7 +362,7 @@ class WordFinderGame {
         lobbies.forEach(l => {
             const card = document.createElement('div'); card.className = 'lobby-list-card';
             const langFlag = l.language === 'tr' ? '🇹🇷' : '🇬🇧';
-            card.innerHTML = `<div class="lobby-list-info"><span class="lobby-list-host">${l.hostName}'s Lobby</span><span class="lobby-list-meta">${langFlag} ${l.playerCount}/${l.maxPlayers} players · ${l.turnsPerPlayer} rounds</span></div><span class="lobby-list-code">${l.code}</span>`;
+            card.innerHTML = `<div class="lobby-list-info"><span class="lobby-list-host">${l.hostName}'s Lobby</span><span class="lobby-list-meta"> ${l.playerCount}/${l.maxPlayers} players · ${l.turnsPerPlayer} rounds</span></div><span class="lobby-list-code">${l.code}</span>`;
             card.addEventListener('click', () => { this.socket.emit('joinLobby', { name: this.myName, code: l.code }); });
             list.appendChild(card);
         });
