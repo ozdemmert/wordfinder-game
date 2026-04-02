@@ -1664,32 +1664,136 @@ body {
     color: var(--text-secondary);
 }
 
-/* ===== Responsive ===== */
-@media (max-width: 480px) {
-    body { padding: 14px; }
+/* ===== Mobile: Revert to original single-column layout ===== */
+@media (max-width: 768px) {
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+        padding: 14px;
+    }
 
+    .screen {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+    }
+
+    /* Game screen: single column, scrollable */
+    .game-screen-wrapper {
+        height: auto;
+        min-height: 100vh;
+        padding: 14px;
+        overflow: auto;
+    }
+
+    .game-panels {
+        flex-direction: column;
+        gap: 16px;
+        overflow: visible;
+    }
+
+    /* Left panel: full width, horizontal scoreboard */
+    .game-panel-left {
+        width: 100%;
+        margin-right: 0;
+        gap: 12px;
+        overflow: visible;
+    }
+
+    .scoreboard {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        overflow: visible;
+        flex: none;
+    }
+
+    .player-card {
+        flex: 1;
+        min-width: 70px;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 8px;
+    }
+
+    .player-card .p-name { flex: none; }
+    .player-card .p-score { font-size: 20px; }
+
+    /* Center panel: full width, not square */
+    .game-panel-center {
+        height: auto;
+        aspect-ratio: auto;
+        flex-shrink: 1;
+        margin: 0;
+        padding: 14px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .game-panel-center .game-board {
+        height: auto;
+        width: 100%;
+        max-width: 440px;
+        aspect-ratio: 1;
+    }
+
+    .game-board {
+        height: auto !important;
+        aspect-ratio: 1;
+    }
+
+    .tile {
+        font-size: 22px;
+        height: auto;
+        width: auto;
+    }
+
+    /* Right panel: full width, horizontal powerups */
+    .game-panel-right {
+        width: 100%;
+        margin-left: 0;
+        gap: 12px;
+        overflow: visible;
+    }
+
+    .powerups-vertical {
+        flex-direction: row;
+        gap: 8px;
+    }
+
+    .powerups-vertical .powerup-btn {
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 12px 8px;
+    }
+
+    .powerups-vertical .powerup-name { text-align: center; }
+
+    .legend-vertical {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-around;
+    }
+
+    .legend-item-h {
+        flex-direction: column;
+        gap: 6px;
+        min-width: 60px;
+        align-items: center;
+    }
+
+    /* General mobile tweaks */
     .game-header { padding: 14px; justify-content: center; }
     .logo h1 { font-size: 22px; }
-
-    .word-display { padding: 14px; min-height: 92px; }
+    .word-display { padding: 14px; }
     .current-word { font-size: 24px; letter-spacing: 3px; }
-    .word-score { position: static; transform: none; max-width: 100%; margin-top: 6px; }
-    .current-word-container { flex-direction: column; gap: 6px; }
-
-    .tile { font-size: 22px; }
-    .game-board { gap: 8px; }
-
-    .powerup-btn { padding: 10px 6px; }
-    .powerup-icon { font-size: 20px; }
-    .powerup-name { font-size: 11px; }
-    .legend-item { min-width: 110px; }
-
     .menu-title { font-size: 28px; }
     .menu-icon { font-size: 36px; }
     .room-code { font-size: 24px; letter-spacing: 6px; }
-
-    .player-card .p-score { font-size: 16px; }
-    .player-card .p-name { font-size: 10px; }
-    .player-card { padding: 8px 6px; }
-    .scoreboard { gap: 6px; }
 }
