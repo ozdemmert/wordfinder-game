@@ -86,26 +86,25 @@ body {
 }
 
 .game-panel-center {
-    flex: 1;
+    /* Square container: size = available height */
+    height: 100%;
+    aspect-ratio: 1;
+    flex-shrink: 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
     background: var(--bg-secondary);
     border-radius: var(--border-radius);
     border: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow: var(--shadow-lg);
-    padding: 24px;
-    min-height: 0;
+    padding: 16px;
     overflow: hidden;
     margin: 0 20px;
-    max-width: 600px;
 }
 
 .game-panel-center .game-board {
     width: 100%;
-    max-width: 520px;
-    max-height: 100%;
-    aspect-ratio: 1;
+    height: 100%;
 }
 
 .game-panel-right {
@@ -388,11 +387,10 @@ body {
 .game-board {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
+    grid-template-rows: repeat(5, 1fr);
+    gap: 8px;
     width: 100%;
-    max-width: 520px;
-    aspect-ratio: 1;
-    max-height: 100%;
+    height: 100%;
 }
 
 /* ===== Tiles ===== */
@@ -404,7 +402,7 @@ body {
     justify-content: center;
     background: var(--tile-bg);
     border-radius: var(--border-radius-sm);
-    font-size: clamp(28px, 4vw, 48px);
+    font-size: clamp(24px, 3.5vh, 52px);
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -413,6 +411,8 @@ body {
     position: relative;
     user-select: none;
     overflow: visible;
+    width: 100%;
+    height: 100%;
 }
 
 .tile:hover:not(.selected):not(.disabled) {
