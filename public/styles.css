@@ -68,7 +68,7 @@ body {
 
 .game-panels {
     display: flex;
-    gap: 20px;
+    gap: 0;
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -82,6 +82,7 @@ body {
     gap: 14px;
     min-height: 0;
     overflow: hidden;
+    margin-right: auto;
 }
 
 .game-panel-center {
@@ -93,9 +94,11 @@ body {
     border-radius: var(--border-radius);
     border: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow: var(--shadow-lg);
-    padding: 20px;
+    padding: 24px;
     min-height: 0;
     overflow: hidden;
+    margin: 0 20px;
+    max-width: 600px;
 }
 
 .game-panel-center .game-board {
@@ -112,6 +115,7 @@ body {
     flex-direction: column;
     gap: 16px;
     overflow: hidden;
+    margin-left: auto;
 }
 
 .panel-section {
@@ -400,7 +404,7 @@ body {
     justify-content: center;
     background: var(--tile-bg);
     border-radius: var(--border-radius-sm);
-    font-size: 32px;
+    font-size: clamp(28px, 4vw, 48px);
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -409,8 +413,6 @@ body {
     position: relative;
     user-select: none;
     overflow: visible;
-    min-width: 56px;
-    min-height: 56px;
 }
 
 .tile:hover:not(.selected):not(.disabled) {
