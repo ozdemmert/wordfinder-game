@@ -43,6 +43,7 @@ class WordFinderGame {
         this.lastSeenActionId = 0;
         this.timerInterval = null;
         this.turnDeadline = null;
+        this.lastLobbySnapshot = null;  // Saved state for server-restart recovery
 
         // DOM
         this.screens = {
@@ -70,13 +71,23 @@ class WordFinderGame {
             this.socket.emit('authenticate', { token: this.token });
         });
 
-        this.socket.on('authenticated', ({ token, reconnected, playerId, name }) => {
+        this.socket.on('authenticated', ({ token, reconnected, playerId, name, serverRestarted }) => {
             this.token = token;
             localStorage.setItem('wf_token', token);
             if (playerId) this.myPlayerId = playerId;
             if (name) this.myName = name;
             if (reconnected && name) {
                 this.menuEls.nicknameInput.value = name;
+            }
+            // Server restarted and lost all state — try to restore from our snapshot
+            if (serverRestarted && !reconnected && this.lastLobbySnapshot && this.screens.game.style.display !== 'none') {
+                console.log('[RESTORE] Server restarted, sending lobby snapshot...');
+                this.showToast('Server restarted — restoring game...', 'info');
+                this.socket.emit('restoreLobby', {
+                    lobbySnapshot: this.lastLobbySnapshot,
+                    oldPlayerId: this.lastLobbySnapshot._myPlayerId,
+                    playerName: this.myName || this.menuEls.nicknameInput.value.trim()
+                });
             }
         });
 
@@ -143,6 +154,11 @@ class WordFinderGame {
         this.socket.on('opponentSelection', ({ playerId, playerName, tiles }) => {
             this.renderOpponentSelection(playerId, playerName, tiles);
         });
+
+        // --- Anti-Sleep: HTTP keep-alive every 60s ---
+        setInterval(() => {
+            fetch('/health').catch(() => {});
+        }, 60 * 1000);
     }
 
     // ===========================================================
@@ -154,6 +170,22 @@ class WordFinderGame {
         this.players = lobby.players;
         this.lobbySettings = lobby.settings;
         this.isHost = (lobby.host === this.myPlayerId);
+
+        // Save a snapshot for server-restart recovery
+        if (lobby.status === 'playing' || lobby.status === 'finished') {
+            this.lastLobbySnapshot = {
+                code: lobby.code,
+                status: lobby.status,
+                settings: lobby.settings,
+                players: lobby.players,
+                playerOrder: lobby.playerOrder,
+                board: lobby.board,
+                currentPlayerIndex: lobby.currentPlayerIndex,
+                currentTurn: lobby.currentTurn,
+                totalTurns: lobby.totalTurns,
+                _myPlayerId: this.myPlayerId
+            };
+        }
 
         if (lobby.status === 'waiting') {
             // Show room screen

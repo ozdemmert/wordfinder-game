@@ -12,7 +12,11 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+    cors: { origin: '*' },
+    pingInterval: 15000,   // Send ping every 15s to keep connection alive
+    pingTimeout: 10000     // Wait 10s for pong before considering disconnected
+});
 
 const PORT = process.env.PORT || 3001;
 const RECONNECT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
@@ -346,14 +350,97 @@ io.on('connection', (socket) => {
                 socket.emit('authenticated', { token, reconnected: true, playerId: session.playerId, name: session.playerName });
             }
         } else {
-            // New session
+            // New session (or server restarted and lost all sessions)
             const newToken = generateToken();
             const playerId = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
             session = { playerId, playerName: '', lobbyCode: null, socketId: socket.id, disconnectedAt: null };
             sessions[newToken] = session;
             sessionToken = newToken;
             socketMap[socket.id] = newToken;
-            socket.emit('authenticated', { token: newToken, reconnected: false, playerId });
+            // Tell client this is a fresh session — if the client was mid-game,
+            // it will send a restoreLobby event with saved state
+            socket.emit('authenticated', { token: newToken, reconnected: false, playerId, serverRestarted: !!token });
+        }
+    });
+
+    // ---------- RESTORE LOBBY (after server restart) ----------
+    socket.on('restoreLobby', ({ lobbySnapshot, oldPlayerId, playerName }) => {
+        if (!session) return;
+        try {
+            const snap = lobbySnapshot;
+            if (!snap || !snap.code || !snap.board || !snap.players || !snap.playerOrder) return;
+
+            session.playerName = playerName;
+
+            // Check if another client already restored this lobby
+            if (lobbies[snap.code]) {
+                const lobby = lobbies[snap.code];
+                // This player needs to rejoin the existing restored lobby
+                const existingPid = snap.playerOrder.find(pid =>
+                    lobby.players[pid] && lobby.players[pid].name === playerName
+                );
+                if (existingPid) {
+                    // Re-map this session to the existing player slot
+                    session.playerId = existingPid;
+                    session.lobbyCode = snap.code;
+                    lobby.players[existingPid].connected = true;
+                    socket.join(snap.code);
+                    socket.emit('authenticated', { token: sessionToken, reconnected: true, playerId: existingPid, name: playerName });
+                    io.to(snap.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+                    io.to(snap.code).emit('toast', { message: `${playerName} reconnected`, type: 'info' });
+                    console.log(`[RESTORE] Player ${playerName} rejoined restored lobby ${snap.code}`);
+                }
+                return;
+            }
+
+            // First client to restore — rebuild the lobby from snapshot
+            const restoredPlayers = {};
+            for (const pid of snap.playerOrder) {
+                const p = snap.players.find(sp => sp.id === pid);
+                if (p) {
+                    restoredPlayers[pid] = {
+                        name: p.name, score: p.score || 0, gems: p.gems || 0,
+                        wordsCount: p.wordsCount || 0, longestWord: p.longestWord || '',
+                        connected: (pid === oldPlayerId) // Only the restoring player is online
+                    };
+                }
+            }
+
+            const lobby = {
+                code: snap.code,
+                host: snap.playerOrder[0],
+                hostName: restoredPlayers[snap.playerOrder[0]]?.name || '?',
+                status: snap.status || 'playing',
+                settings: snap.settings || { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0, language: 'en' },
+                players: restoredPlayers,
+                playerOrder: snap.playerOrder,
+                board: snap.board,
+                currentPlayerIndex: snap.currentPlayerIndex || 0,
+                currentTurn: snap.currentTurn || 0,
+                totalTurns: snap.totalTurns || 0,
+                lastAction: null,
+                lastActionId: 0,
+                turnDeadline: null
+            };
+
+            lobbies[snap.code] = lobby;
+
+            // Re-map this session to the old player ID
+            session.playerId = oldPlayerId;
+            session.lobbyCode = snap.code;
+            lobby.players[oldPlayerId].connected = true;
+            if (lobby.host === oldPlayerId) lobby.hostName = playerName;
+
+            socket.join(snap.code);
+            socket.emit('authenticated', { token: sessionToken, reconnected: true, playerId: oldPlayerId, name: playerName });
+
+            // Restart timer if game was in progress
+            if (lobby.status === 'playing') startTurnTimer(lobby);
+
+            io.to(snap.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
+            console.log(`[RESTORE] Lobby ${snap.code} restored by ${playerName} with ${snap.playerOrder.length} players`);
+        } catch (err) {
+            console.error('[ERROR] restoreLobby:', err.message);
         }
     });
 
