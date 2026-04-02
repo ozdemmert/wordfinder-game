@@ -144,7 +144,7 @@
             </div>
         </header>
         <div class="game-panels">
-            <!-- LEFT PANEL: Main Game -->
+            <!-- LEFT PANEL: Score & Word -->
             <div class="game-panel-left">
                 <div class="scoreboard" id="scoreboard"></div>
                 <div class="turn-indicator" id="turn-indicator">Player 1's Turn</div>
@@ -155,7 +155,6 @@
                     </div>
                     <div class="word-validation" id="word-validation"></div>
                 </div>
-                <div class="board-container"><div class="game-board" id="game-board"></div></div>
                 <div class="action-buttons">
                     <button class="action-btn submit-btn" id="submit-btn" disabled>
                         <span class="btn-icon">✓</span><span class="btn-text">SUBMIT</span>
@@ -164,6 +163,10 @@
                         <span class="btn-icon">↺</span><span class="btn-text">CLEAR</span>
                     </button>
                 </div>
+            </div>
+            <!-- CENTER: Game Board -->
+            <div class="game-panel-center">
+                <div class="game-board" id="game-board"></div>
             </div>
             <!-- RIGHT PANEL: Power-ups & Info -->
             <div class="game-panel-right">

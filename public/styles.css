@@ -55,47 +55,69 @@ body {
     overflow: hidden;
 }
 
-/* ===== Game Screen Two-Panel Layout ===== */
+/* ===== Game Screen Three-Panel Layout ===== */
 .game-screen-wrapper {
     width: 100%;
     height: 100vh;
     display: flex;
     flex-direction: column;
-    padding: 12px 20px;
-    gap: 10px;
+    padding: 12px 24px;
+    gap: 12px;
     overflow: hidden;
 }
 
 .game-panels {
     display: flex;
-    gap: 16px;
+    gap: 20px;
     flex: 1;
     min-height: 0;
     overflow: hidden;
 }
 
 .game-panel-left {
-    flex: 1;
+    width: 220px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 14px;
     min-height: 0;
     overflow: hidden;
 }
 
+.game-panel-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: var(--shadow-lg);
+    padding: 20px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.game-panel-center .game-board {
+    width: 100%;
+    max-width: 520px;
+    max-height: 100%;
+    aspect-ratio: 1;
+}
+
 .game-panel-right {
-    width: 200px;
+    width: 210px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
     overflow: hidden;
 }
 
 .panel-section {
     background: var(--bg-secondary);
     border-radius: var(--border-radius);
-    padding: 14px;
+    padding: 16px;
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -105,20 +127,20 @@ body {
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .powerups-vertical {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
 }
 
 .powerups-vertical .powerup-btn {
     flex-direction: row;
     justify-content: flex-start;
     gap: 10px;
-    padding: 10px 12px;
+    padding: 12px 14px;
     width: 100%;
 }
 
@@ -129,13 +151,13 @@ body {
 .legend-vertical {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
 }
 
 .legend-item-h {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
 .legend-item-h span {
@@ -359,26 +381,12 @@ body {
 .word-validation.invalid { color: var(--error); }
 
 /* ===== Game Board ===== */
-.board-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 12px;
-    background: var(--bg-secondary);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-}
-
 .game-board {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 8px;
+    gap: 10px;
     width: 100%;
-    max-width: min(100%, 440px);
+    max-width: 520px;
     aspect-ratio: 1;
     max-height: 100%;
 }
@@ -1533,22 +1541,23 @@ body {
 /* ===== Multiplayer Scoreboard ===== */
 .scoreboard {
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
 }
 
 .player-card {
-    flex: 1;
-    min-width: 70px;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 10px 8px;
+    gap: 8px;
+    padding: 8px 10px;
     background: var(--bg-secondary);
     border-radius: var(--border-radius-sm);
     border: 2px solid transparent;
     transition: all 0.3s ease;
+    flex-shrink: 0;
 }
 
 .player-card.active {
@@ -1563,7 +1572,7 @@ body {
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    max-width: 100%;
+    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1572,7 +1581,7 @@ body {
 .player-card.active .p-name { color: var(--accent-secondary); }
 
 .player-card .p-score {
-    font-size: 20px;
+    font-size: 15px;
     font-weight: 800;
     color: var(--warning);
     line-height: 1;
