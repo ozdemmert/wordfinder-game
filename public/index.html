@@ -135,7 +135,7 @@
     </div>
 
     <!-- ========== GAME SCREEN ========== -->
-    <div class="screen game-container" id="game-screen" style="display:none;">
+    <div class="screen game-screen-wrapper" id="game-screen" style="display:none;">
         <header class="game-header">
             <div class="logo"><span class="logo-icon">✨</span><h1>WordFinder</h1></div>
             <div class="header-actions">
@@ -143,37 +143,48 @@
                 <button class="icon-btn leave-game-btn" id="leave-game-btn" title="Leave Game">🚪</button>
             </div>
         </header>
-        <div class="scoreboard" id="scoreboard"></div>
-        <div class="turn-indicator" id="turn-indicator">Player 1's Turn</div>
-        <div class="word-display">
-            <div class="current-word-container">
-                <span class="current-word" id="current-word">Select word...</span>
-                <span class="word-score" id="word-score"></span>
+        <div class="game-panels">
+            <!-- LEFT PANEL: Main Game -->
+            <div class="game-panel-left">
+                <div class="scoreboard" id="scoreboard"></div>
+                <div class="turn-indicator" id="turn-indicator">Player 1's Turn</div>
+                <div class="word-display">
+                    <div class="current-word-container">
+                        <span class="current-word" id="current-word">Select word...</span>
+                        <span class="word-score" id="word-score"></span>
+                    </div>
+                    <div class="word-validation" id="word-validation"></div>
+                </div>
+                <div class="board-container"><div class="game-board" id="game-board"></div></div>
+                <div class="action-buttons">
+                    <button class="action-btn submit-btn" id="submit-btn" disabled>
+                        <span class="btn-icon">✓</span><span class="btn-text">SUBMIT</span>
+                    </button>
+                    <button class="action-btn clear-btn" id="clear-btn">
+                        <span class="btn-icon">↺</span><span class="btn-text">CLEAR</span>
+                    </button>
+                </div>
             </div>
-            <div class="word-validation" id="word-validation"></div>
-        </div>
-        <div class="board-container"><div class="game-board" id="game-board"></div></div>
-        <div class="action-buttons">
-            <button class="action-btn submit-btn" id="submit-btn" disabled>
-                <span class="btn-icon">✓</span><span class="btn-text">SUBMIT</span>
-            </button>
-            <button class="action-btn clear-btn" id="clear-btn">
-                <span class="btn-icon">↺</span><span class="btn-text">CLEAR</span>
-            </button>
-        </div>
-        <div class="powerups">
-            <button class="powerup-btn" id="shuffle-btn" data-cost="1"><span class="powerup-icon">🔀</span><span class="powerup-name">Shuffle</span><span class="powerup-cost">💎 1</span></button>
-            <button class="powerup-btn" id="swap-btn" data-cost="3"><span class="powerup-icon">🔄</span><span class="powerup-name">Swap</span><span class="powerup-cost">💎 3</span></button>
-            <button class="powerup-btn" id="hint-btn" data-cost="2"><span class="powerup-icon">💡</span><span class="powerup-name">Hint</span><span class="powerup-cost">💎 2</span></button>
-            <button class="powerup-btn" id="change-btn" data-cost="4"><span class="powerup-icon">✏️</span><span class="powerup-name">Change</span><span class="powerup-cost">💎 4</span></button>
-        </div>
-        <div class="legend">
-            <div class="legend-title">Bonus Tiles</div>
-            <div class="legend-items">
-                <div class="legend-item"><div class="legend-tile double-letter">A</div><span>2x Letter</span></div>
-                <div class="legend-item"><div class="legend-tile triple-letter">B</div><span>3x Letter</span></div>
-                <div class="legend-item"><div class="legend-tile double-word">C</div><span>2x Word</span></div>
-                <div class="legend-item"><div class="legend-tile gem-tile">D<span class="gem-indicator">💎</span></div><span>Gem</span></div>
+            <!-- RIGHT PANEL: Power-ups & Info -->
+            <div class="game-panel-right">
+                <div class="panel-section">
+                    <div class="panel-section-title">⚡ Power-ups</div>
+                    <div class="powerups-vertical">
+                        <button class="powerup-btn" id="shuffle-btn" data-cost="1"><span class="powerup-icon">🔀</span><span class="powerup-name">Shuffle</span><span class="powerup-cost">💎 1</span></button>
+                        <button class="powerup-btn" id="hint-btn" data-cost="2"><span class="powerup-icon">💡</span><span class="powerup-name">Hint</span><span class="powerup-cost">💎 2</span></button>
+                        <button class="powerup-btn" id="swap-btn" data-cost="3"><span class="powerup-icon">🔄</span><span class="powerup-name">Swap</span><span class="powerup-cost">💎 3</span></button>
+                        <button class="powerup-btn" id="change-btn" data-cost="4"><span class="powerup-icon">✏️</span><span class="powerup-name">Change</span><span class="powerup-cost">💎 4</span></button>
+                    </div>
+                </div>
+                <div class="panel-section">
+                    <div class="panel-section-title">🎯 Bonus Tiles</div>
+                    <div class="legend-vertical">
+                        <div class="legend-item-h"><div class="legend-tile double-letter">A</div><span>2x Letter</span></div>
+                        <div class="legend-item-h"><div class="legend-tile triple-letter">B</div><span>3x Letter</span></div>
+                        <div class="legend-item-h"><div class="legend-tile double-word">C</div><span>2x Word</span></div>
+                        <div class="legend-item-h"><div class="legend-tile gem-tile">D<span class="gem-indicator">💎</span></div><span>Gem (+1💎)</span></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

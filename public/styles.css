@@ -45,23 +45,102 @@ body {
     background-image:
         radial-gradient(ellipse at 20% 20%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
         radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
-    min-height: 100vh;
+    height: 100vh;
     color: var(--text-primary);
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 20px;
-    overflow-x: hidden;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
 }
 
-/* ===== Game Container ===== */
-.game-container {
+/* ===== Game Screen Two-Panel Layout ===== */
+.game-screen-wrapper {
     width: 100%;
-    max-width: 500px;
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    animation: fadeInUp 0.6s ease-out;
+    padding: 12px 20px;
+    gap: 10px;
+    overflow: hidden;
+}
+
+.game-panels {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.game-panel-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.game-panel-right {
+    width: 200px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.panel-section {
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.panel-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.powerups-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.powerups-vertical .powerup-btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    width: 100%;
+}
+
+.powerups-vertical .powerup-icon { font-size: 18px; flex-shrink: 0; }
+.powerups-vertical .powerup-name { font-size: 13px; flex: 1; text-align: left; }
+.powerups-vertical .powerup-cost { font-size: 11px; flex-shrink: 0; }
+
+.legend-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.legend-item-h {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.legend-item-h span {
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 @keyframes fadeInUp {
@@ -207,20 +286,18 @@ body {
 /* ===== Word Display ===== */
 .word-display {
     background: var(--bg-secondary);
-    border-radius: var(--border-radius);
-    padding: 16px 20px;              /* padding geri eklendi: taşmayı azaltır */
+    border-radius: var(--border-radius-sm);
+    padding: 10px 16px;
     text-align: center;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    min-height: 100px;
-    text-align: center;
-    justify-items: center;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     position: relative;
-    overflow: hidden;                /* score vs taşma */
+    overflow: hidden;
+    flex-shrink: 0;
 }
 
 .current-word-container {
@@ -234,7 +311,7 @@ body {
 }
 
 .current-word {
-    font-size: 32px;
+    font-size: 26px;
     font-weight: 800;
     letter-spacing: 4px;
     text-transform: uppercase;
@@ -243,7 +320,7 @@ body {
     line-height: 1;
     max-width: 100%;
     overflow: hidden;
-    text-overflow: ellipsis;         /* uzun kelimede taşmasın */
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -285,20 +362,25 @@ body {
 .board-container {
     display: flex;
     justify-content: center;
-    padding: clamp(14px, 4vw, 20px);  /* küçük ekranda taşmayı azaltır */
+    align-items: center;
+    padding: 12px;
     background: var(--bg-secondary);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-lg);
     border: 1px solid rgba(255, 255, 255, 0.05);
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .game-board {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
+    gap: 8px;
     width: 100%;
-    max-width: 440px;
+    max-width: min(100%, 440px);
     aspect-ratio: 1;
+    max-height: 100%;
 }
 
 /* ===== Tiles ===== */
@@ -503,12 +585,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 16px 24px;
+    gap: 8px;
+    padding: 12px 16px;
     border: none;
     border-radius: var(--border-radius-sm);
     font-family: 'Outfit', sans-serif;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -976,11 +1058,12 @@ body {
 /* ===== Shared Screen Layout ===== */
 .screen {
     width: 100%;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 20px;
+    overflow: hidden;
     animation: fadeInUp 0.5s ease-out;
 }
 
