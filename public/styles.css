@@ -26,6 +26,185 @@
     --shadow-glow: 0 0 30px var(--accent-glow);
 }
 
+/* ===== Light Theme ===== */
+[data-theme="light"] {
+    --bg-primary: #f0f2f5;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e8eaef;
+    --accent-primary: #7c3aed;
+    --accent-secondary: #a855f7;
+    --accent-glow: rgba(124, 58, 237, 0.25);
+    --text-primary: #1a1a2e;
+    --text-secondary: #6b7280;
+    --success: #059669;
+    --warning: #d97706;
+    --error: #dc2626;
+    --gem-color: #0891b2;
+    --double-letter: #2563eb;
+    --triple-letter: #7c3aed;
+    --double-word: #ea580c;
+    --tile-bg: linear-gradient(145deg, #ffffff, #eef0f4);
+    --tile-selected: linear-gradient(145deg, #c4b5fd, #a78bfa);
+    --tile-hover: linear-gradient(145deg, #f3f0ff, #ede9fe);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+    --shadow-glow: 0 0 20px var(--accent-glow);
+}
+
+[data-theme="light"] body {
+    background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(124, 58, 237, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
+}
+
+[data-theme="light"] .game-panel-left,
+[data-theme="light"] .game-panel-center,
+[data-theme="light"] .panel-section,
+[data-theme="light"] .game-header,
+[data-theme="light"] .menu-section,
+[data-theme="light"] .setting-row,
+[data-theme="light"] .join-form,
+[data-theme="light"] .available-lobbies,
+[data-theme="light"] .room-code-display,
+[data-theme="light"] .room-player-card,
+[data-theme="light"] .word-display,
+[data-theme="light"] .modal-content,
+[data-theme="light"] .letter-picker-content,
+[data-theme="light"] .toast,
+[data-theme="light"] .legend {
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .menu-btn {
+    border-color: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .menu-input {
+    border-color: rgba(0, 0, 0, 0.12);
+    background: var(--bg-tertiary);
+}
+
+[data-theme="light"] .tile {
+    border-color: rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+}
+
+[data-theme="light"] .tile.selected {
+    color: #ffffff;
+    border-color: var(--accent-primary);
+}
+
+[data-theme="light"] .tile-points {
+    color: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .icon-btn {
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .icon-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .clear-btn {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .player-card {
+    border-color: transparent;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .player-card.active {
+    background: linear-gradient(145deg, rgba(124, 58, 237, 0.08), var(--bg-secondary));
+}
+
+[data-theme="light"] .stepper-btn {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .lang-btn {
+    border-color: rgba(0, 0, 0, 0.1);
+    background: var(--bg-secondary);
+}
+
+[data-theme="light"] .modal {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .letter-picker-overlay {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .letter-grid button {
+    color: var(--text-primary);
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .swap-indicator {
+    color: #ffffff;
+}
+
+[data-theme="light"] .lobby-list-card {
+    border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .leave-game-btn:hover {
+    background: rgba(220, 38, 38, 0.1) !important;
+}
+
+/* ===== Theme Toggle Button (Fixed Top-Right) ===== */
+.theme-toggle-fixed {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    z-index: 999;
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(12px);
+    transition: all 0.2s ease;
+}
+
+[data-theme="light"] .theme-toggle-fixed {
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.theme-toggle-option {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    transition: all 0.25s ease;
+    padding: 0;
+    line-height: 1;
+    color: var(--text-secondary);
+}
+
+.theme-toggle-option:hover {
+    background: rgba(124, 58, 237, 0.15);
+}
+
+.theme-toggle-option.active {
+    background: var(--accent-primary);
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);
+}
+
 * {
     margin: 0;
     padding: 0;
