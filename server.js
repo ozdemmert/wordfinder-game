@@ -50,7 +50,16 @@ const { startTurnTimer, clearTurnTimer } = registerHandlers(io, lobbies, session
 
 // ===== HTTP routes =====
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', lobbies: Object.keys(lobbies).length, sessions: Object.keys(sessions).length });
+    const activeSessions = Object.values(sessions).filter(s => s.socketId).length;
+    const activeGames = Object.values(lobbies).filter(l => l.status === 'playing').length;
+    const waitingLobbies = Object.values(lobbies).filter(l => l.status === 'waiting').length;
+    res.json({
+        status: 'ok',
+        uptime: Math.floor(process.uptime()),
+        lobbies: { total: Object.keys(lobbies).length, playing: activeGames, waiting: waitingLobbies },
+        sessions: { total: Object.keys(sessions).length, online: activeSessions },
+        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
+    });
 });
 
 app.get('*', (req, res) => {

@@ -16,6 +16,10 @@ const LETTERS_TR = {
     'J': 10
 };
 
+function trackEvent(name, params = {}) {
+    if (typeof gtag !== 'undefined') gtag('event', name, params);
+}
+
 class WordFinderGame {
     constructor() {
         this.socket = io();
@@ -96,6 +100,7 @@ class WordFinderGame {
             this.isHost = true;
             this.roomEls.codeDisplay.textContent = code;
             this.showScreen('lobbyRoom');
+            trackEvent('lobby_created');
         });
 
         this.socket.on('lobbyUpdate', ({ lobby }) => {
@@ -115,9 +120,11 @@ class WordFinderGame {
                 this.elements.currentWord.classList.add('shake');
                 setTimeout(() => this.elements.currentWord.classList.remove('shake'), 300);
                 this.elements.submitBtn.disabled = false;
+                trackEvent('word_invalid', { word_length: word.length });
             } else {
                 window.soundManager.play('submit');
                 this.showToast(`+${score} points!`, 'success');
+                trackEvent('word_submitted', { word_length: word.length, score });
             }
         });
 
@@ -191,10 +198,18 @@ class WordFinderGame {
             }
             this.renderRoom(lobby);
         } else if (lobby.status === 'playing') {
+            if (this._lastTrackedStatus !== 'playing') {
+                trackEvent('game_start', { language: lobby.settings.language, players: lobby.playerOrder.length });
+            }
             this.handleGameState(lobby);
         } else if (lobby.status === 'finished') {
+            if (this._lastTrackedStatus !== 'finished') {
+                const me = lobby.players.find(p => p.id === this.myPlayerId);
+                trackEvent('game_finish', { score: me?.score || 0, language: lobby.settings.language });
+            }
             this.handleGameState(lobby);
         }
+        this._lastTrackedStatus = lobby.status;
     }
 
     renderRoom(lobby) {
@@ -298,9 +313,9 @@ class WordFinderGame {
         this.roomEls.copyBtn.addEventListener('click', () => this.copyRoomCode());
         this.elements.submitBtn.addEventListener('click', () => { window.soundManager.play('click'); this.submitWord(); });
         this.elements.clearBtn.addEventListener('click', () => { window.soundManager.play('click'); this.clearSelection(); });
-        this.elements.shuffleBtn.addEventListener('click', () => { window.soundManager.play('click'); this.socket.emit('useShuffle'); });
+        this.elements.shuffleBtn.addEventListener('click', () => { window.soundManager.play('click'); this.socket.emit('useShuffle'); trackEvent('powerup_used', { type: 'shuffle' }); });
         this.elements.swapBtn.addEventListener('click', () => { window.soundManager.play('click'); this.startSwapMode(); });
-        this.elements.hintBtn.addEventListener('click', () => { window.soundManager.play('click'); this.elements.hintBtn.disabled = true; this.showToast('Searching...', 'info'); this.socket.emit('useHint'); });
+        this.elements.hintBtn.addEventListener('click', () => { window.soundManager.play('click'); this.elements.hintBtn.disabled = true; this.showToast('Searching...', 'info'); this.socket.emit('useHint'); trackEvent('powerup_used', { type: 'hint' }); });
         this.elements.changeBtn.addEventListener('click', () => { window.soundManager.play('click'); this.startChangeMode(); });
         this.elements.cancelChange.addEventListener('click', () => { window.soundManager.play('click'); this.cancelChangeMode(); });
         this.elements.letterPickerCancel.addEventListener('click', () => { window.soundManager.play('click'); this.cancelChangeMode(); });
@@ -480,7 +495,7 @@ class WordFinderGame {
         if (!this.swapFirstTile) { this.swapFirstTile = { row, col }; el.classList.add('swap-selected'); this.showToast('Select second tile', 'info'); }
         else {
             if (this.swapFirstTile.row === row && this.swapFirstTile.col === col) { this.showToast('Pick a different tile!', 'error'); return; }
-            this.socket.emit('useSwap', { tile1: this.swapFirstTile, tile2: { row, col } });
+            this.socket.emit('useSwap', { tile1: this.swapFirstTile, tile2: { row, col } }); trackEvent('powerup_used', { type: 'swap' });
             this.isSwapMode = false; this.swapFirstTile = null; this.elements.swapIndicator.classList.remove('active');
         }
     }
@@ -525,7 +540,7 @@ class WordFinderGame {
     selectChangeLetter(letter) {
         if (!this.changeTile) return;
         window.soundManager.play('click');
-        this.socket.emit('useChange', { row: this.changeTile.row, col: this.changeTile.col, newLetter: letter });
+        this.socket.emit('useChange', { row: this.changeTile.row, col: this.changeTile.col, newLetter: letter }); trackEvent('powerup_used', { type: 'change' });
         this.cancelChangeMode();
     }
 
