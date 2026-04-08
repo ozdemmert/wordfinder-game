@@ -1,811 +1,109 @@
-// ===== WordFinder – Node.js + Socket.IO Server =====
-
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const crypto = require('crypto');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
+const { loadState, persistLobby, persistSession, persistWordCache } = require('./src/redis');
+const { wordCache, setWordCachePersist } = require('./src/words');
+const { advanceTurn } = require('./src/lobby');
+const registerHandlers = require('./src/handlers');
+
+// ===== Express + Socket.IO =====
 const app = express();
 app.use(cors());
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: '*' },
-    pingInterval: 15000,   // Send ping every 15s to keep connection alive
-    pingTimeout: 10000     // Wait 10s for pong before considering disconnected
+    pingInterval: 15000,
+    pingTimeout: 10000
 });
 
 const PORT = process.env.PORT || 3001;
-const RECONNECT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 // ===== Crash Protection =====
 process.on('uncaughtException', (err) => {
     console.error('[FATAL] Uncaught Exception:', err.message, err.stack);
-    // Don't exit — keep the server running
 });
 process.on('unhandledRejection', (reason) => {
     console.error('[FATAL] Unhandled Rejection:', reason);
 });
 
 // ===== State =====
-const lobbies = {};       // code -> lobby
-const sessions = {};      // token -> session
-const socketMap = {};     // socketId -> token
-const turnTimers = {};    // lobbyCode -> timeout handle
+const lobbies = {};
+const sessions = {};
+const socketMap = {};
 
-// ===== Letter Distributions =====
-const LETTERS_EN = {
-    'E': { count: 12, points: 1 }, 'A': { count: 9, points: 1 },
-    'I': { count: 9, points: 1 },  'O': { count: 8, points: 1 },
-    'N': { count: 6, points: 1 },  'R': { count: 6, points: 1 },
-    'T': { count: 6, points: 1 },  'L': { count: 4, points: 1 },
-    'S': { count: 4, points: 1 },  'U': { count: 4, points: 1 },
-    'D': { count: 4, points: 2 },  'G': { count: 3, points: 2 },
-    'B': { count: 2, points: 3 },  'C': { count: 2, points: 3 },
-    'M': { count: 2, points: 3 },  'P': { count: 2, points: 3 },
-    'F': { count: 2, points: 4 },  'H': { count: 2, points: 4 },
-    'V': { count: 2, points: 4 },  'W': { count: 2, points: 4 },
-    'Y': { count: 2, points: 4 },  'K': { count: 1, points: 5 },
-    'J': { count: 1, points: 8 },  'X': { count: 1, points: 8 },
-    'Q': { count: 1, points: 10 }, 'Z': { count: 1, points: 10 }
+// ===== Persistence wrappers (bind state objects) =====
+const persist = {
+    lobby: (code) => persistLobby(lobbies, code),
+    session: (token) => persistSession(sessions, token),
 };
+setWordCachePersist(persistWordCache);
 
-const LETTERS_TR = {
-    'A': { count: 12, points: 1 }, 'E': { count: 8, points: 1 },
-    'İ': { count: 7, points: 1 },  'K': { count: 7, points: 1 },
-    'L': { count: 7, points: 1 },  'N': { count: 7, points: 1 },
-    'R': { count: 6, points: 1 },  'T': { count: 5, points: 1 },
-    'I': { count: 4, points: 2 },  'M': { count: 4, points: 2 },
-    'O': { count: 3, points: 2 },  'S': { count: 3, points: 2 },
-    'U': { count: 3, points: 2 },
-    'B': { count: 2, points: 3 },  'D': { count: 4, points: 3 },
-    'Ş': { count: 3, points: 3 },  'Ü': { count: 3, points: 3 },
-    'Y': { count: 3, points: 3 },
-    'C': { count: 2, points: 4 },  'Ç': { count: 2, points: 4 },
-    'Z': { count: 2, points: 4 },
-    'G': { count: 2, points: 5 },  'H': { count: 1, points: 5 },
-    'P': { count: 1, points: 5 },
-    'F': { count: 1, points: 7 },  'Ö': { count: 1, points: 7 },
-    'V': { count: 1, points: 7 },
-    'J': { count: 1, points: 10 }
-};
+// ===== Register Socket.IO handlers =====
+const { startTurnTimer, clearTurnTimer } = registerHandlers(io, lobbies, sessions, socketMap, persist);
 
-const LETTERS_BY_LANG = { en: LETTERS_EN, tr: LETTERS_TR };
-function getLetters(lang) { return LETTERS_BY_LANG[lang] || LETTERS_EN; }
-
-// ===== Word Validation (Server-Side — no CORS issues) =====
-const wordCache = new Map();
-
-// Pre-populate cache with common valid 2-letter English words
-const COMMON_TWO_LETTER_WORDS_EN = ['aa','ab','ad','ae','ag','ah','ai','al','am','an','ar','as','at','aw','ax','ay','ba','be','bi','bo','by','da','de','do','ed','ef','eh','el','em','en','er','es','et','ew','ex','fa','fe','go','ha','he','hi','hm','ho','id','if','in','is','it','jo','ka','ki','la','li','lo','ma','me','mi','mm','mo','mu','my','na','ne','no','nu','od','oe','of','oh','oi','ok','om','on','oo','op','or','os','ou','ow','ox','oy','pa','pe','pi','po','qi','re','sh','si','so','ta','ti','to','uh','um','un','up','us','ut','we','wo','xi','xu','ya','ye','yo','za'];
-for (const w of COMMON_TWO_LETTER_WORDS_EN) wordCache.set(`en:${w}`, true);
-
-// Pre-populate cache with common valid 2-letter Turkish words
-const COMMON_TWO_LETTER_WORDS_TR = ['ab','ac','ad','af','ah','ak','al','am','an','ar','as','aş','at','av','ay','az','bu','da','de','el','en','er','es','et','ev','ey','ha','he','iç','il','im','in','ip','ir','is','iş','it','iz','ki','ne','of','oh','ok','ol','on','op','ot','öç','öd','öf','ön','öz','su','şu','ta','üç','üs','üz','ya','ye'];
-for (const w of COMMON_TWO_LETTER_WORDS_TR) wordCache.set(`tr:${w}`, true);
-
-async function isValidWord(word, language = 'en') {
-    if (!word || word.length < 2) return false;
-    const lower = language === 'tr' ? word.toLocaleLowerCase('tr-TR') : word.toLowerCase();
-    const key = `${language}:${lower}`;
-    if (wordCache.has(key)) return wordCache.get(key);
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-        let url;
-        if (language === 'tr') {
-            url = `https://freedictionaryapi.com/api/v1/entries/tr/${encodeURIComponent(lower)}`;
-        } else {
-            url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(lower)}`;
-        }
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeout);
-        let valid;
-        if (language === 'tr') {
-            // freedictionaryapi.com (v1) returns {"entries": []} for invalid words
-            const data = await res.json();
-            valid = data && Array.isArray(data.entries) && data.entries.length > 0;
-        } else {
-            valid = res.ok;
-        }
-        wordCache.set(key, valid);
-        return valid;
-    } catch { return false; }
-}
-
-// ===== Helpers =====
-function generateToken() { return crypto.randomUUID(); }
-
-function generateRoomCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
-    if (lobbies[code]) return generateRoomCode();
-    return code;
-}
-
-const TOTAL_WEIGHT_EN = Object.values(LETTERS_EN).reduce((sum, d) => sum + d.count, 0);
-const TOTAL_WEIGHT_TR = Object.values(LETTERS_TR).reduce((sum, d) => sum + d.count, 0);
-
-function weightedRandomLetter(lang = 'en') {
-    const letters = getLetters(lang);
-    const totalWeight = lang === 'tr' ? TOTAL_WEIGHT_TR : TOTAL_WEIGHT_EN;
-    let r = Math.random() * totalWeight;
-    for (const [letter, data] of Object.entries(letters)) {
-        r -= data.count;
-        if (r <= 0) return letter;
-    }
-    return lang === 'tr' ? 'A' : 'E';
-}
-
-function generateBoard(lang = 'en') {
-    const board = [];
-    const letters = getLetters(lang);
-    const bonusPos = generateBonusPositions(), gemPos = generateGemPositions();
-    for (let r = 0; r < 5; r++) { board[r] = []; for (let c = 0; c < 5; c++) {
-        const letter = weightedRandomLetter(lang);
-        const key = `${r}-${c}`;
-        board[r][c] = { letter, points: letters[letter].points, row: r, col: c, bonus: bonusPos[key] || null, hasGem: gemPos.has(key) };
-    }} return board;
-}
-
-function generateBonusPositions() {
-    const b = {}, p = [];
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) p.push(`${r}-${c}`);
-    for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
-    b[p[0]] = 'double-letter'; b[p[1]] = 'double-letter'; b[p[2]] = 'triple-letter'; b[p[3]] = 'triple-letter'; b[p[4]] = 'double-word';
-    return b;
-}
-
-function generateGemPositions() {
-    const g = new Set(), p = [];
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) p.push(`${r}-${c}`);
-    for (let i = 0; i < 3; i++) g.add(p.splice(Math.floor(Math.random() * p.length), 1)[0]);
-    return g;
-}
-
-function validatePath(tiles) {
-    if (!tiles || tiles.length === 0) return false;
-    const seen = new Set();
-    for (let i = 0; i < tiles.length; i++) {
-        const { row, col } = tiles[i];
-        if (row < 0 || row >= 5 || col < 0 || col >= 5) return false;
-        const key = `${row}-${col}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        if (i > 0) {
-            const rd = Math.abs(row - tiles[i - 1].row), cd = Math.abs(col - tiles[i - 1].col);
-            if (rd > 1 || cd > 1 || (rd === 0 && cd === 0)) return false;
-        }
-    }
-    return true;
-}
-
-function calculateScore(board, tiles) {
-    let score = 0, wm = 1;
-    for (const { row, col } of tiles) {
-        const t = board[row][col];
-        let ls = t.points;
-        if (t.bonus === 'double-letter') ls *= 2;
-        else if (t.bonus === 'triple-letter') ls *= 3;
-        else if (t.bonus === 'double-word') wm *= 2;
-        score += ls;
-    }
-    score *= wm;
-    if (tiles.length >= 6) score += 10;
-    return score;
-}
-
-function refillUsedTiles(board, tiles, lang = 'en') {
-    const letters = getLetters(lang);
-    for (const { row, col } of tiles) {
-        const nl = weightedRandomLetter(lang);
-        board[row][col].letter = nl;
-        board[row][col].points = letters[nl].points;
-        board[row][col].hasGem = false;
-        board[row][col].bonus = null;
-    }
-}
-
-// Respawn consumed bonuses & gems on random empty tiles
-function respawnBonuses(board, usedBonuses, usedGemCount) {
-    const getEmpty = () => {
-        const avail = [];
-        for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++)
-            if (!board[r][c].bonus && !board[r][c].hasGem) avail.push({ r, c });
-        return avail;
-    };
-    for (const bonus of usedBonuses) {
-        const avail = getEmpty();
-        if (avail.length > 0) { const p = avail[Math.floor(Math.random() * avail.length)]; board[p.r][p.c].bonus = bonus; }
-    }
-    for (let i = 0; i < usedGemCount; i++) {
-        const avail = getEmpty();
-        if (avail.length > 0) { const p = avail[Math.floor(Math.random() * avail.length)]; board[p.r][p.c].hasGem = true; }
-    }
-}
-
-
-
-
-function shuffleBoardLetters(board, lang = 'en') {
-    const ltrs = [];
-    const letterTable = getLetters(lang);
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) ltrs.push(board[r][c].letter);
-    for (let i = ltrs.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ltrs[i], ltrs[j]] = [ltrs[j], ltrs[i]]; }
-    let idx = 0;
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-        board[r][c].letter = ltrs[idx]; board[r][c].points = letterTable[ltrs[idx]].points; idx++;
-    }
-}
-
-// ===== Hint: find all 2-letter adjacent pairs on the board =====
-function findTwoLetterPairs(board) {
-    const pairs = new Set();
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-            if (dr === 0 && dc === 0) continue;
-            const nr = r + dr, nc = c + dc;
-            if (nr < 0 || nr >= 5 || nc < 0 || nc >= 5) continue;
-            pairs.add(board[r][c].letter + board[nr][nc].letter);
-        }
-    }
-    return [...pairs];
-}
-
-// ===== Turn timer helpers =====
-function startTurnTimer(lobby) {
-    clearTurnTimer(lobby.code);
-    if (!lobby.settings.turnTime || lobby.settings.turnTime <= 0) return;
-    lobby.turnDeadline = Date.now() + lobby.settings.turnTime * 1000;
-    turnTimers[lobby.code] = setTimeout(() => {
-        try {
-            if (!lobby || !lobbies[lobby.code] || lobby.status !== 'playing') return;
-            lobby.currentPlayerIndex = (lobby.currentPlayerIndex + 1) % lobby.playerOrder.length;
-            lobby.currentTurn++;
-            lobby.lastAction = null;
-            lobby.lastActionId = (lobby.lastActionId || 0) + 1;
-            if (lobby.currentTurn >= lobby.totalTurns) { lobby.status = 'finished'; clearTurnTimer(lobby.code); }
-            awardPeriodicGems(lobby);
-            if (lobby.status === 'playing') startTurnTimer(lobby);
-            io.to(lobby.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-            io.to(lobby.code).emit('toast', { message: 'Time\'s up! Turn skipped.', type: 'error' });
-        } catch (err) {
-            console.error('[ERROR] Turn timer callback:', err.message);
-        }
-    }, lobby.settings.turnTime * 1000);
-}
-
-function clearTurnTimer(code) {
-    if (turnTimers[code]) { clearTimeout(turnTimers[code]); delete turnTimers[code]; }
-}
-
-// ===== Periodic gem bonus (every turn, all players get +1 gem) =====
-function awardPeriodicGems(lobby) {
-    if (lobby.status !== 'playing') return;
-    for (const pid of lobby.playerOrder) {
-        lobby.players[pid].gems = Math.min(15, lobby.players[pid].gems + 1);
-    }
-}
-
-// ===== Build lobby payload for clients =====
-function lobbyPayload(lobby) {
-    return {
-        code: lobby.code,
-        host: lobby.host,
-        hostName: lobby.hostName,
-        status: lobby.status,
-        settings: lobby.settings,
-        players: lobby.playerOrder.map(pid => ({
-            id: pid,
-            name: lobby.players[pid]?.name || '?',
-            score: lobby.players[pid]?.score || 0,
-            gems: lobby.players[pid]?.gems || 0,
-            wordsCount: lobby.players[pid]?.wordsCount || 0,
-            longestWord: lobby.players[pid]?.longestWord || '',
-            connected: lobby.players[pid]?.connected !== false
-        })),
-        playerOrder: lobby.playerOrder,
-        board: lobby.board || null,
-        currentPlayerIndex: lobby.currentPlayerIndex || 0,
-        currentTurn: lobby.currentTurn || 0,
-        totalTurns: lobby.totalTurns || 0,
-        lastAction: lobby.lastAction || null,
-        lastActionId: lobby.lastActionId || 0,
-        turnTimeRemaining: lobby.turnDeadline ? Math.max(0, (lobby.turnDeadline - Date.now()) / 1000) : null
-    };
-}
-
-// ===== Socket.IO =====
-io.on('connection', (socket) => {
-    console.log(`[+] ${socket.id} connected`);
-    let sessionToken = null;
-    let session = null;
-
-    // ---------- AUTHENTICATE ----------
-    socket.on('authenticate', ({ token }) => {
-        if (token && sessions[token]) {
-            // Reconnect
-            session = sessions[token];
-            sessionToken = token;
-            session.socketId = socket.id;
-            session.disconnectedAt = null;
-            socketMap[socket.id] = token;
-
-            if (session.lobbyCode && lobbies[session.lobbyCode]) {
-                const lobby = lobbies[session.lobbyCode];
-                if (lobby.players[session.playerId]) {
-                    lobby.players[session.playerId].connected = true;
-                }
-                socket.join(session.lobbyCode);
-                socket.emit('authenticated', { token, reconnected: true, playerId: session.playerId, name: session.playerName });
-                socket.emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-                socket.to(session.lobbyCode).emit('toast', { message: `${session.playerName} reconnected`, type: 'info' });
-                io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-            } else {
-                session.lobbyCode = null;
-                socket.emit('authenticated', { token, reconnected: true, playerId: session.playerId, name: session.playerName });
-            }
-        } else {
-            // New session (or server restarted and lost all sessions)
-            const newToken = generateToken();
-            const playerId = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
-            session = { playerId, playerName: '', lobbyCode: null, socketId: socket.id, disconnectedAt: null };
-            sessions[newToken] = session;
-            sessionToken = newToken;
-            socketMap[socket.id] = newToken;
-            // Tell client this is a fresh session — if the client was mid-game,
-            // it will send a restoreLobby event with saved state
-            socket.emit('authenticated', { token: newToken, reconnected: false, playerId, serverRestarted: !!token });
-        }
-    });
-
-    // ---------- RESTORE LOBBY (after server restart) ----------
-    socket.on('restoreLobby', ({ lobbySnapshot, oldPlayerId, playerName }) => {
-        if (!session) return;
-        try {
-            const snap = lobbySnapshot;
-            if (!snap || !snap.code || !snap.board || !snap.players || !snap.playerOrder) return;
-
-            session.playerName = playerName;
-
-            // Check if another client already restored this lobby
-            if (lobbies[snap.code]) {
-                const lobby = lobbies[snap.code];
-                // This player needs to rejoin the existing restored lobby
-                const existingPid = snap.playerOrder.find(pid =>
-                    lobby.players[pid] && lobby.players[pid].name === playerName
-                );
-                if (existingPid) {
-                    // Re-map this session to the existing player slot
-                    session.playerId = existingPid;
-                    session.lobbyCode = snap.code;
-                    lobby.players[existingPid].connected = true;
-                    socket.join(snap.code);
-                    socket.emit('authenticated', { token: sessionToken, reconnected: true, playerId: existingPid, name: playerName });
-                    io.to(snap.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-                    io.to(snap.code).emit('toast', { message: `${playerName} reconnected`, type: 'info' });
-                    console.log(`[RESTORE] Player ${playerName} rejoined restored lobby ${snap.code}`);
-                }
-                return;
-            }
-
-            // First client to restore — rebuild the lobby from snapshot
-            const restoredPlayers = {};
-            for (const pid of snap.playerOrder) {
-                const p = snap.players.find(sp => sp.id === pid);
-                if (p) {
-                    restoredPlayers[pid] = {
-                        name: p.name, score: p.score || 0, gems: p.gems || 0,
-                        wordsCount: p.wordsCount || 0, longestWord: p.longestWord || '',
-                        connected: (pid === oldPlayerId) // Only the restoring player is online
-                    };
-                }
-            }
-
-            const lobby = {
-                code: snap.code,
-                host: snap.playerOrder[0],
-                hostName: restoredPlayers[snap.playerOrder[0]]?.name || '?',
-                status: snap.status || 'playing',
-                settings: snap.settings || { maxPlayers: 4, turnsPerPlayer: 5, startingGems: 5, turnTime: 0, language: 'en' },
-                players: restoredPlayers,
-                playerOrder: snap.playerOrder,
-                board: snap.board,
-                currentPlayerIndex: snap.currentPlayerIndex || 0,
-                currentTurn: snap.currentTurn || 0,
-                totalTurns: snap.totalTurns || 0,
-                lastAction: null,
-                lastActionId: 0,
-                turnDeadline: null
-            };
-
-            lobbies[snap.code] = lobby;
-
-            // Re-map this session to the old player ID
-            session.playerId = oldPlayerId;
-            session.lobbyCode = snap.code;
-            lobby.players[oldPlayerId].connected = true;
-            if (lobby.host === oldPlayerId) lobby.hostName = playerName;
-
-            socket.join(snap.code);
-            socket.emit('authenticated', { token: sessionToken, reconnected: true, playerId: oldPlayerId, name: playerName });
-
-            // Restart timer if game was in progress
-            if (lobby.status === 'playing') startTurnTimer(lobby);
-
-            io.to(snap.code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-            console.log(`[RESTORE] Lobby ${snap.code} restored by ${playerName} with ${snap.playerOrder.length} players`);
-        } catch (err) {
-            console.error('[ERROR] restoreLobby:', err.message);
-        }
-    });
-
-    // ---------- CREATE LOBBY ----------
-    socket.on('createLobby', ({ name, settings }) => {
-        if (!session) return;
-        session.playerName = name;
-        const code = generateRoomCode();
-        const turnTime = Math.min(120, Math.max(0, settings.turnTime || 0));
-        const language = settings.language === 'tr' ? 'tr' : 'en';
-        const lobby = {
-            code, host: session.playerId, hostName: name, status: 'waiting',
-            settings: { maxPlayers: Math.min(6, Math.max(1, settings.maxPlayers || 4)), turnsPerPlayer: Math.min(20, Math.max(1, settings.turnsPerPlayer || 5)), startingGems: Math.min(15, Math.max(0, settings.startingGems || 5)), turnTime, language },
-            players: { [session.playerId]: { name, score: 0, gems: settings.startingGems || 5, wordsCount: 0, longestWord: '', connected: true } },
-            playerOrder: [session.playerId],
-            board: null, currentPlayerIndex: 0, currentTurn: 0, totalTurns: 0, lastAction: null, lastActionId: 0, turnDeadline: null
-        };
-        lobbies[code] = lobby;
-        session.lobbyCode = code;
-        socket.join(code);
-        socket.emit('lobbyCreated', { code });
-        socket.emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-        io.emit('lobbiesChanged');
-    });
-
-    // ---------- JOIN LOBBY ----------
-    socket.on('joinLobby', ({ name, code }) => {
-        if (!session) return;
-        code = (code || '').toUpperCase();
-        const lobby = lobbies[code];
-        if (!lobby) { socket.emit('error', { message: 'Lobby not found!' }); return; }
-        if (lobby.status !== 'waiting') { socket.emit('error', { message: 'Game already in progress!' }); return; }
-        if (lobby.playerOrder.length >= lobby.settings.maxPlayers) { socket.emit('error', { message: 'Lobby is full!' }); return; }
-        const names = Object.values(lobby.players).map(p => p.name.toLowerCase());
-        if (names.includes(name.toLowerCase())) { socket.emit('error', { message: 'Nickname already taken!' }); return; }
-
-        session.playerName = name;
-        session.lobbyCode = code;
-        lobby.players[session.playerId] = { name, score: 0, gems: lobby.settings.startingGems, wordsCount: 0, longestWord: '', connected: true };
-        lobby.playerOrder.push(session.playerId);
-        socket.join(code);
-        io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-        socket.to(code).emit('toast', { message: `${name} joined`, type: 'info' });
-        io.emit('lobbiesChanged');
-    });
-
-    // ---------- GET LOBBIES ----------
-    socket.on('getLobbies', () => {
-        const list = Object.values(lobbies)
-            .filter(l => l.status === 'waiting')
-            .map(l => ({ code: l.code, hostName: l.hostName, playerCount: l.playerOrder.length, maxPlayers: l.settings.maxPlayers, turnsPerPlayer: l.settings.turnsPerPlayer, language: l.settings.language }));
-        socket.emit('lobbiesList', { lobbies: list });
-    });
-
-    // ---------- LEAVE LOBBY / GAME ----------
-    socket.on('leaveLobby', () => {
-        if (!session || !session.lobbyCode) return;
-        removePFromLobby(session, socket);
-    });
-
-    socket.on('leaveGame', () => {
-        if (!session || !session.lobbyCode) return;
-        removePFromLobby(session, socket);
-    });
-
-    // ---------- START GAME ----------
-    socket.on('startGame', () => {
-        if (!session || !session.lobbyCode) return;
-        const lobby = lobbies[session.lobbyCode];
-        if (!lobby || lobby.host !== session.playerId || lobby.status !== 'waiting') return;
-
-        lobby.board = generateBoard(lobby.settings.language);
-        lobby.status = 'playing';
-        lobby.currentPlayerIndex = 0;
-        lobby.currentTurn = 0;
-        lobby.totalTurns = lobby.settings.turnsPerPlayer * lobby.playerOrder.length;
-        lobby.lastAction = null;
-        lobby.lastActionId = 0;
-
-        for (const pid of lobby.playerOrder) {
-            lobby.players[pid].score = 0;
-            lobby.players[pid].gems = lobby.settings.startingGems;
-            lobby.players[pid].wordsCount = 0;
-            lobby.players[pid].longestWord = '';
-        }
-
-        startTurnTimer(lobby);
-        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-        io.emit('lobbiesChanged');
-    });
-
-    // ---------- LIVE TILE SELECTION ----------
-    socket.on('tileSelect', ({ tiles }) => {
-        if (!session || !session.lobbyCode) return;
-        socket.to(session.lobbyCode).emit('opponentSelection', { playerId: session.playerId, playerName: session.playerName, tiles: tiles || [] });
-    });
-
-    // ---------- SUBMIT WORD ----------
-    socket.on('submitWord', async ({ tiles }) => {
-        if (!session || !session.lobbyCode) return;
-        const lobby = lobbies[session.lobbyCode];
-        if (!lobby || lobby.status !== 'playing') return;
-
-        const currentPid = lobby.playerOrder[lobby.currentPlayerIndex];
-        if (currentPid !== session.playerId) { socket.emit('error', { message: 'Not your turn!' }); return; }
-        if (!validatePath(tiles)) { socket.emit('error', { message: 'Invalid tile path!' }); return; }
-
-        const word = tiles.map(t => lobby.board[t.row][t.col].letter).join('');
-        if (word.length < 2) { socket.emit('error', { message: 'Word too short!' }); return; }
-
-        const lang = lobby.settings.language || 'en';
-        const valid = await isValidWord(word, lang);
-        if (!valid) { socket.emit('wordResult', { valid: false, word }); return; }
-
-        clearTurnTimer(session.lobbyCode);
-
-        const score = calculateScore(lobby.board, tiles);
-        const player = lobby.players[session.playerId];
-        player.score += score;
-
-        // Track consumed bonuses & gems for respawn
-        const usedBonuses = [];
-        let usedDW = false;
-        for (const { row, col } of tiles) {
-            const b = lobby.board[row][col].bonus;
-            if (b === 'double-letter' || b === 'triple-letter') usedBonuses.push(b);
-            if (b === 'double-word') { usedDW = true; usedBonuses.push(b); }
-        }
-
-        let gc = 0;
-        for (const { row, col } of tiles) if (lobby.board[row][col].hasGem) { gc++; lobby.board[row][col].hasGem = false; }
-        player.gems = Math.min(15, player.gems + gc);
-
-        player.wordsCount++;
-        if (word.length > player.longestWord.length) player.longestWord = word;
-
-        refillUsedTiles(lobby.board, tiles, lang);
-        respawnBonuses(lobby.board, usedBonuses, gc);
-
-        lobby.currentPlayerIndex = (lobby.currentPlayerIndex + 1) % lobby.playerOrder.length;
-        lobby.currentTurn++;
-        lobby.lastActionId = (lobby.lastActionId || 0) + 1;
-        lobby.lastAction = { playerId: session.playerId, playerName: session.playerName, word, score };
-
-        // Lowest-score gem bonus at end of each round
-        awardPeriodicGems(lobby);
-
-        if (lobby.currentTurn >= lobby.totalTurns) { lobby.status = 'finished'; clearTurnTimer(session.lobbyCode); }
-        else startTurnTimer(lobby);
-
-        socket.emit('wordResult', { valid: true, word, score });
-        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-    });
-
-    // ---------- SHUFFLE ----------
-    socket.on('useShuffle', () => {
-        if (!session || !session.lobbyCode) return;
-        const lobby = lobbies[session.lobbyCode];
-        if (!lobby || lobby.status !== 'playing') return;
-        if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
-        const player = lobby.players[session.playerId];
-        if (player.gems < 1) { socket.emit('error', { message: 'Not enough gems!' }); return; }
-        player.gems -= 1;
-        shuffleBoardLetters(lobby.board, lobby.settings.language);
-        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-        io.to(session.lobbyCode).emit('toast', { message: `${session.playerName} shuffled the board`, type: 'info' });
-    });
-
-    // ---------- SWAP ----------
-    socket.on('useSwap', ({ tile1, tile2 }) => {
-        if (!session || !session.lobbyCode) return;
-        const lobby = lobbies[session.lobbyCode];
-        if (!lobby || lobby.status !== 'playing') return;
-        if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
-        const player = lobby.players[session.playerId];
-        if (player.gems < 3) { socket.emit('error', { message: 'Not enough gems!' }); return; }
-        if (!tile1 || !tile2 || tile1.row < 0 || tile1.row >= 5 || tile2.row < 0 || tile2.row >= 5) return;
-
-        player.gems -= 3;
-        const a = lobby.board[tile1.row][tile1.col], b = lobby.board[tile2.row][tile2.col];
-        const [tl, tp] = [a.letter, a.points];
-        a.letter = b.letter; a.points = b.points;
-        b.letter = tl; b.points = tp;
-        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-    });
-
-    // ---------- CHANGE (replace a tile's letter) ----------
-    socket.on('useChange', ({ row, col, newLetter }) => {
-        if (!session || !session.lobbyCode) return;
-        const lobby = lobbies[session.lobbyCode];
-        if (!lobby || lobby.status !== 'playing') return;
-        if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
-        const player = lobby.players[session.playerId];
-        if (player.gems < 4) { socket.emit('error', { message: 'Not enough gems!' }); return; }
-        if (row < 0 || row >= 5 || col < 0 || col >= 5) return;
-        const letter = (newLetter || '').toUpperCase();
-        const letterTable = getLetters(lobby.settings.language);
-        if (!letterTable[letter]) return;
-        player.gems -= 4;
-        lobby.board[row][col].letter = letter;
-        lobby.board[row][col].points = letterTable[letter].points;
-        io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-        io.to(session.lobbyCode).emit('toast', { message: `${session.playerName} changed a tile`, type: 'info' });
-    });
-
-    // ---------- HINT (2-letter words, shuffle until found) ----------
-    socket.on('useHint', async () => {
-        if (!session || !session.lobbyCode) return;
-        const lobby = lobbies[session.lobbyCode];
-        if (!lobby || lobby.status !== 'playing') return;
-        if (lobby.playerOrder[lobby.currentPlayerIndex] !== session.playerId) return;
-        const player = lobby.players[session.playerId];
-        if (player.gems < 2) { socket.emit('error', { message: 'Not enough gems!' }); return; }
-
-        let foundWord = null;
-        const MAX_ATTEMPTS = 5;
-        const lang = lobby.settings.language || 'en';
-
-        for (let attempt = 0; attempt <= MAX_ATTEMPTS; attempt++) {
-            const pairs = findTwoLetterPairs(lobby.board);
-            // Check cached words first (instant)
-            for (const w of pairs) {
-                const lowerW = lang === 'tr' ? w.toLocaleLowerCase('tr-TR') : w.toLowerCase();
-                if (wordCache.get(`${lang}:${lowerW}`)) { foundWord = w; break; }
-            }
-            if (foundWord) break;
-            // Check uncached words sequentially with early exit
-            for (const w of pairs) {
-                const lowerW = lang === 'tr' ? w.toLocaleLowerCase('tr-TR') : w.toLowerCase();
-                if (wordCache.has(`${lang}:${lowerW}`)) continue;
-                const valid = await isValidWord(w, lang);
-                if (valid) { foundWord = w; break; }
-            }
-            if (foundWord) break;
-            // Shuffle and try again
-            shuffleBoardLetters(lobby.board, lang);
-        }
-
-        if (foundWord) {
-            player.gems -= 2;
-            io.to(session.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-            socket.emit('hintResult', { word: foundWord, found: true });
-        } else {
-            socket.emit('hintResult', { word: null, found: false });
-        }
-    });
-
-    // ---------- DISCONNECT ----------
-    socket.on('disconnect', () => {
-        console.log(`[-] ${socket.id} disconnected`);
-        const token = socketMap[socket.id];
-        delete socketMap[socket.id];
-        if (!token || !sessions[token]) return;
-
-        const sess = sessions[token];
-        sess.socketId = null;
-        sess.disconnectedAt = Date.now();
-
-        if (sess.lobbyCode && lobbies[sess.lobbyCode]) {
-            const lobby = lobbies[sess.lobbyCode];
-            if (lobby.players[sess.playerId]) lobby.players[sess.playerId].connected = false;
-            io.to(sess.lobbyCode).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-            io.to(sess.lobbyCode).emit('toast', { message: `${sess.playerName} disconnected`, type: 'error' });
-        }
-
-        // Auto-remove after timeout
-        setTimeout(() => {
-            if (sess.disconnectedAt && Date.now() - sess.disconnectedAt >= RECONNECT_TIMEOUT) {
-                if (sess.lobbyCode && lobbies[sess.lobbyCode]) {
-                    removePFromLobbyByPid(sess.playerId, sess.lobbyCode);
-                }
-                delete sessions[token];
-            }
-        }, RECONNECT_TIMEOUT + 1000);
-    });
-});
-
-// ===== Remove player from lobby (handles mid-game) =====
-function removePlayerFromGame(lobby, playerId) {
-    const wasPlaying = lobby.status === 'playing';
-    const leavingIdx = lobby.playerOrder.indexOf(playerId);
-
-    delete lobby.players[playerId];
-    lobby.playerOrder = lobby.playerOrder.filter(id => id !== playerId);
-
-    if (lobby.playerOrder.length === 0) { return 'delete'; }
-
-    // Transfer host
-    if (lobby.host === playerId) {
-        lobby.host = lobby.playerOrder[0];
-        lobby.hostName = lobby.players[lobby.playerOrder[0]]?.name || '?';
-    }
-
-    if (wasPlaying && lobby.playerOrder.length > 0) {
-        // Fix: simply recalculate total turns for remaining player count
-        lobby.totalTurns = lobby.settings.turnsPerPlayer * lobby.playerOrder.length;
-
-        // Adjust current player index
-        if (leavingIdx >= 0) {
-            if (leavingIdx < lobby.currentPlayerIndex) {
-                lobby.currentPlayerIndex--;
-            } else if (leavingIdx === lobby.currentPlayerIndex) {
-                // It was the leaving player's turn — don't increment, just wrap
-            }
-            // Wrap if needed
-            if (lobby.currentPlayerIndex >= lobby.playerOrder.length) {
-                lobby.currentPlayerIndex = 0;
-            }
-        }
-
-        // End game if only 1 player left
-        if (lobby.playerOrder.length <= 1) {
-            lobby.status = 'finished';
-        }
-    }
-
-    return 'updated';
-}
-
-function removePFromLobby(sess, socket) {
-    const code = sess.lobbyCode;
-    const lobby = lobbies[code];
-    if (!lobby) { sess.lobbyCode = null; return; }
-
-    const playerName = sess.playerName;
-    socket.leave(code);
-    const result = removePlayerFromGame(lobby, sess.playerId);
-    sess.lobbyCode = null;
-
-    if (result === 'delete') {
-        delete lobbies[code];
-    } else {
-        io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-        io.to(code).emit('toast', { message: `${playerName} left the game`, type: 'error' });
-    }
-    io.emit('lobbiesChanged');
-}
-
-function removePFromLobbyByPid(playerId, code) {
-    const lobby = lobbies[code];
-    if (!lobby) return;
-    const result = removePlayerFromGame(lobby, playerId);
-    if (result === 'delete') {
-        delete lobbies[code];
-    } else {
-        io.to(code).emit('lobbyUpdate', { lobby: lobbyPayload(lobby) });
-    }
-    io.emit('lobbiesChanged');
-}
-
-// ===== Health Check =====
+// ===== HTTP routes =====
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', lobbies: Object.keys(lobbies).length, sessions: Object.keys(sessions).length });
 });
 
-// SPA fallback
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-server.listen(PORT, () => {
-    console.log(`🎮 WordFinder server running on port ${PORT}`);
+// ===== Lobby cleanup (every 10 minutes) =====
+setInterval(() => {
+    const now = Date.now();
+    for (const [code, lobby] of Object.entries(lobbies)) {
+        const allDisconnected = lobby.playerOrder.every(pid => !lobby.players[pid]?.connected);
+        const isStale = (lobby.status === 'finished') || (lobby.status === 'waiting' && allDisconnected);
+        if (isStale) {
+            if (!lobby._staleAt) { lobby._staleAt = now; continue; }
+            if (now - lobby._staleAt > 30 * 60 * 1000) {
+                console.log(`[CLEANUP] Removing stale lobby ${code} (status: ${lobby.status})`);
+                delete lobbies[code];
+                persist.lobby(code);
+            }
+        } else {
+            lobby._staleAt = null;
+        }
+    }
+}, 10 * 60 * 1000);
+
+// ===== Start =====
+loadState(lobbies, sessions, wordCache).then(() => {
+    // Reconstruct turn timers for playing lobbies
+    for (const lobby of Object.values(lobbies)) {
+        if (lobby.status === 'playing' && lobby.turnDeadline) {
+            const remaining = lobby.turnDeadline - Date.now();
+            if (remaining > 0) {
+                startTurnTimer(lobby, io, persist, remaining);
+            } else {
+                advanceTurn(lobby);
+                if (lobby.currentTurn >= lobby.totalTurns) {
+                    lobby.status = 'finished';
+                } else {
+                    startTurnTimer(lobby, io, persist);
+                }
+                persist.lobby(lobby.code);
+            }
+        }
+    }
+    server.listen(PORT, () => {
+        console.log(`🎮 WordFinder server running on port ${PORT}`);
+    });
+}).catch(() => {
+    server.listen(PORT, () => {
+        console.log(`🎮 WordFinder server running on port ${PORT} (no Redis)`);
+    });
 });
 
-// Keep-alive: log server status periodically
 setInterval(() => {
     console.log(`[HEARTBEAT] ${new Date().toISOString()} | Lobbies: ${Object.keys(lobbies).length} | Sessions: ${Object.keys(sessions).length}`);
 }, 5 * 60 * 1000);

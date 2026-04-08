@@ -1,0 +1,6 @@
+# Replace with your domain (e.g., yourname.duckdns.org or your .me domain)
+# For IP-only access without SSL, use:  :80 { reverse_proxy app:3001 }
+
+:80 {
+    reverse_proxy app:3001
+}

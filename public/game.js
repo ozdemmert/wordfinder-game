@@ -155,10 +155,6 @@ class WordFinderGame {
             this.renderOpponentSelection(playerId, playerName, tiles);
         });
 
-        // --- Anti-Sleep: HTTP keep-alive every 60s ---
-        setInterval(() => {
-            fetch('/health').catch(() => {});
-        }, 60 * 1000);
     }
 
     // ===========================================================

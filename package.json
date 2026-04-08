@@ -7,9 +7,11 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.21.0",
-    "socket.io": "^4.7.5",
-    "cors": "^2.8.5"
+    "express-rate-limit": "^8.3.2",
+    "ioredis": "^5.10.1",
+    "socket.io": "^4.7.5"
   },
   "engines": {
     "node": ">=18.0.0"
