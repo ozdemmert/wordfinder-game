@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ':*)",
+      "Bash(wc -l server.js src/*.js)"
+    ]
+  }
+}

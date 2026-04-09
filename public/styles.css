@@ -1562,7 +1562,6 @@ body {
 
 .lobby-list-card:hover {
     border-color: var(--gem-color);
-    transform: translateY(-1px);
 }
 
 .lobby-list-info {
