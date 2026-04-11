@@ -89,6 +89,12 @@ Google Analytics GA4 is set up in `public/index.html`. Custom events tracked in 
 | `public/audio.js` | `SoundManager` — Web Audio API synthesis, no audio files |
 | `public/theme.js` | Theme manager — reads `localStorage`, respects `prefers-color-scheme` |
 
+### Responsive layout
+
+Breakpoint: `768px`. Above → 3-panel horizontal layout (left: scores/word, center: board, right: power-ups). Below → single-column vertical layout.
+
+**Important:** `.word-display` uses `width: 100%` on desktop and `width: 320px` on mobile (`@media (max-width: 768px)`). This fixed mobile width is intentional — using a percentage value on mobile causes the container to shrink when the placeholder text ("Select word...") is replaced by a shorter selected word, which cascades and shifts the entire layout.
+
 ## Deployment
 
 Deployed on GCP e2-micro VM (us-central1-a) via Docker Compose. Three containers: `app` (Node.js), `redis` (Redis 7, 128 MB max), `caddy` (reverse proxy + auto SSL via Let's Encrypt).

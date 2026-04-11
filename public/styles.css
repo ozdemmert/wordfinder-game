@@ -494,7 +494,7 @@ body {
 
 /* ===== Word Display ===== */
 .word-display {
-    width: 320px;
+    width: 100%;
     background: var(--bg-secondary);
     border-radius: var(--border-radius-sm);
     padding: 10px 16px;
@@ -546,7 +546,6 @@ body {
     color: var(--warning);
     opacity: 0;
     transition: opacity 0.3s ease;
-    min-width: 48px;
     max-width: 40%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -590,7 +589,7 @@ body {
     font-size: clamp(32px, 5vh, 64px);
     font-weight: 700;
     cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+    transition: all 0.2s ease;
     box-shadow: var(--shadow-sm);
     border: 2px solid transparent;
     position: relative;
@@ -1975,7 +1974,7 @@ body {
     /* General mobile tweaks */
     .game-header { padding: 14px; justify-content: center; }
     .logo h1 { font-size: 22px; }
-    .word-display { padding: 14px; }
+    .word-display { padding: 14px; width: 320px; }
     .current-word { font-size: 24px; letter-spacing: 3px; }
     .menu-title { font-size: 28px; }
     .menu-icon { font-size: 36px; }
